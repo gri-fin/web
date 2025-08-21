@@ -1,0 +1,2451 @@
+  
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+  <title>crop pest research portal</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script>
+      // Automatically take user to search modal after registration
+      function openSearchModal() {
+        // You may want to implement this function or call it after registration
+      }
+      // Automatically reload the page every 30 minutes for all users
+      setInterval(function() {
+        window.location.reload();
+      }, 1800000); // 30 minutes in milliseconds
+      window.addEventListener('DOMContentLoaded', function() {
+        var createdByModal = document.getElementById('createdByModal');
+        if (createdByModal) createdByModal.style.display = 'block';
+      });
+    </script>
+<html lang="en">
+  ...existing code...
+    <script>
+      // Simple user store (for demo purposes, use server/db in production)
+      let users = JSON.parse(localStorage.getItem('users') || '{}');
+      let currentUser = null;
+      let paidUsers = JSON.parse(localStorage.getItem('paidUsers') || '{}');
+
+      function validatePassword(password) {
+        const hasUppercase = /[A-Z]/.test(password);
+        const digitCount = (password.match(/\d/g) || []).length;
+        return hasUppercase && digitCount >= 5;
+      }
+
+      function registerUser() {
+        const username = document.querySelector('#registerModalHeader input[placeholder="Username"]').value.trim();
+        const email = document.querySelector('#registerModalHeader input[placeholder="Email (optional)"]').value.trim();
+        const phone = document.querySelector('#registerModalHeader input[placeholder="Phone number (optional)"]').value.trim();
+        const password = document.querySelector('#registerModalHeader input[placeholder="Password"]').value;
+        const profilePicInput = document.getElementById('profilePicInput');
+        let profilePicData = '';
+        if (profilePicInput && profilePicInput.files && profilePicInput.files[0]) {
+          const file = profilePicInput.files[0];
+          const reader = new FileReader();
+          reader.onload = function(e) {
+            profilePicData = e.target.result;
+            finishRegistration(username, email, phone, password, profilePicData);
+          };
+          reader.readAsDataURL(file);
+          return;
+        }
+        finishRegistration(username, email, phone, password, profilePicData);
+      }
+
+      function finishRegistration(username, email, phone, password, profilePicData) {
+        if (!username || !password) {
+          alert('Please fill all required fields.');
+          return;
+        }
+        // Require valid email or phone number
+        const emailPattern = /^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$/;
+        const phonePattern = /^\d{10}$/;
+        if (!(emailPattern.test(email) || phonePattern.test(phone))) {
+          alert('Please provide a valid Email (all lowercase) or a Phone number with exactly 10 digits.');
+          return;
+        }
+        if (email && email !== email.toLowerCase()) {
+          alert('Email must be in small letters (lowercase).');
+          return;
+        }
+        if (users[username]) {
+          alert('Username already exists. Please choose another.');
+          return;
+        }
+        if (!validatePassword(password)) {
+          alert('Password must have at least one uppercase letter and at least five digits.');
+          return;
+        }
+        users[username] = { email, phone, password, profilePicData };
+        localStorage.setItem('users', JSON.stringify(users));
+  // No confirmation reply, just go to search modal
+        document.querySelector('#registerModalHeader input[placeholder="Username"]').value = '';
+        document.querySelector('#registerModalHeader input[placeholder="Email (optional)"]').value = '';
+        document.querySelector('#registerModalHeader input[placeholder="Phone number (optional)"]').value = '';
+        document.querySelector('#registerModalHeader input[placeholder="Password"]').value = '';
+        document.getElementById('profilePicInput').value = '';
+        document.getElementById('loginModalHeader').style.display = 'none';
+        document.getElementById('registerModalHeader').style.display = 'none';
+        let profile = document.getElementById('userProfileHeader');
+        if (!profile) {
+          profile = document.createElement('div');
+          profile.id = 'userProfileHeader';
+          profile.style = "background:linear-gradient(90deg,#ffd600 0%,#4caf50 100%); color:#222; font-family:'Montserrat', Arial, sans-serif; font-size:1.15em; font-weight:700; border-radius:16px; box-shadow:0 4px 24px #a5d6a7; padding:2em; max-width:350px; width:100%; min-width:220px; box-sizing:border-box; margin-top:1em; display:flex; flex-direction:column; align-items:center; gap:1em;";
+          profile.innerHTML = `
+            <img id='profilePicDisplay' src='${profilePicData || "https://img.icons8.com/color/48/000000/user-male-circle.png"}' alt='Profile Icon' style='height:70px; width:70px; border-radius:50%; object-fit:cover; box-shadow:0 2px 8px #fff; margin-bottom:0.5em;'>
+            <span style='font-size:1.2em; font-weight:900; color:#388e3c;'>Welcome, ${username}!</span>
+            <span style='font-size:1em; color:#222;'>Your profile is active.</span>
+            ${phone ? `<span style='font-size:0.95em; color:#388e3c;'>Phone: ${phone}</span>` : ''}
+            ${email ? `<span style='font-size:0.95em; color:#388e3c;'>Email: ${email}</span>` : ''}
+          `;
+          document.getElementById('loginModalHeader').parentNode.insertBefore(profile, document.getElementById('loginModalHeader').nextSibling);
+        } else {
+          profile.querySelector('span').textContent = `Welcome, ${username}!`;
+          const pic = document.getElementById('profilePicDisplay');
+          if (pic) pic.src = profilePicData || "https://img.icons8.com/color/48/000000/user-male-circle.png";
+        }
+  profile.style.display = 'flex';
+  currentUser = username;
+  localStorage.setItem('loggedInUser', username);
+  if (window.enableSearchAccess) window.enableSearchAccess();
+        // Automatically show payment modal after registration
+        let paymentModal = document.getElementById('paymentModal');
+        if (paymentModal) {
+          paymentModal.style.display = 'flex';
+        }
+      }
+
+      function loginUser() {
+        const username = document.querySelector('#loginModalHeader input[placeholder="Username"]').value.trim();
+        const password = document.querySelector('#loginModalHeader input[placeholder="Password"]').value;
+        if (!username || !password) {
+          alert('Please fill all fields.');
+          return;
+        }
+        if (!users[username]) {
+          alert('Username not found. Please register first.');
+          return;
+        }
+        if (users[username].password !== password) {
+          alert('Incorrect password.');
+          return;
+        }
+        // Show login button popup
+        let loginPopup = document.createElement('div');
+        loginPopup.innerHTML = `<button onclick="this.parentNode.remove();" style="background:linear-gradient(90deg,#ffd600 0%,#4caf50 100%); color:#222; font-family:'Montserrat',Arial,sans-serif; font-size:1.18em; font-weight:900; border-radius:18px; box-shadow:0 4px 24px #a5d6a7; padding:1em 2em; z-index:100001; text-align:center; display:inline-block; letter-spacing:0.02em; cursor:pointer;">Login</button>`;
+        loginPopup.style = 'position:fixed; top:80px; left:50%; transform:translateX(-50%); z-index:100001;';
+        document.body.appendChild(loginPopup);
+        showConfirmation('Login successful! Welcome, ' + username + '.');
+// Show confirmation text and auto-remove after 2 seconds
+function showConfirmation(message) {
+  let confirmDiv = document.createElement('div');
+  confirmDiv.innerHTML = `<div style="background:linear-gradient(90deg,#ffd600 0%,#4caf50 100%); color:#222; font-family:'Montserrat',Arial,sans-serif; font-size:1.18em; font-weight:900; border-radius:18px; box-shadow:0 4px 24px #a5d6a7; padding:1.2em 2.2em; z-index:100000; text-align:center; display:inline-block; letter-spacing:0.02em;">${message}</div>`;
+  confirmDiv.style = 'position:fixed; top:32px; left:50%; transform:translateX(-50%); z-index:100000;';
+  document.body.appendChild(confirmDiv);
+  setTimeout(function() {
+    confirmDiv.remove();
+  }, 2000);
+}
+        document.querySelector('#loginModalHeader input[placeholder="Username"]').value = '';
+        document.querySelector('#loginModalHeader input[placeholder="Password"]').value = '';
+        document.getElementById('loginModalHeader').style.display = 'none';
+        document.getElementById('registerModalHeader').style.display = 'none';
+        let profile = document.getElementById('userProfileHeader');
+        let user = users[username];
+        let profilePicData = user && user.profilePicData ? user.profilePicData : "https://img.icons8.com/color/48/000000/user-male-circle.png";
+        if (!profile) {
+          profile = document.createElement('div');
+          profile.id = 'userProfileHeader';
+          profile.style = "background:linear-gradient(90deg,#ffd600 0%,#4caf50 100%); color:#222; font-family:'Montserrat', Arial, sans-serif; font-size:1.15em; font-weight:700; border-radius:16px; box-shadow:0 4px 24px #a5d6a7; padding:2em; max-width:350px; width:100%; min-width:220px; box-sizing:border-box; margin-top:1em; display:flex; flex-direction:column; align-items:center; gap:1em;";
+          profile.innerHTML = `
+            <img id='profilePicDisplay' src='${profilePicData}' alt='Profile Icon' style='height:70px; width:70px; border-radius:50%; object-fit:cover; box-shadow:0 2px 8px #fff; margin-bottom:0.5em;'>
+            <span style='font-size:1.2em; font-weight:900; color:#388e3c;'>Welcome, ${username}!</span>
+            <span style='font-size:1em; color:#222;'>Your profile is active.</span>
+            ${user.phone ? `<span style='font-size:0.95em; color:#388e3c;'>Phone: ${user.phone}</span>` : ''}
+            ${user.email ? `<span style='font-size:0.95em; color:#388e3c;'>Email: ${user.email}</span>` : ''}
+          `;
+          document.getElementById('loginModalHeader').parentNode.insertBefore(profile, document.getElementById('loginModalHeader').nextSibling);
+        } else {
+          profile.querySelector('span').textContent = `Welcome, ${username}!`;
+          const pic = document.getElementById('profilePicDisplay');
+          if (pic) pic.src = profilePicData;
+        }
+        profile.style.display = 'flex';
+        currentUser = username;
+        if (window.enableSearchAccess) window.enableSearchAccess();
+      }
+
+      function checkSearchAccess() {
+        if (!currentUser) {
+          alert('You must be registered and logged in to access search.');
+          return false;
+        }
+        if (paidUsers[currentUser]) {
+          return true;
+        }
+        if (freeSearchCount < 5) {
+          freeSearchCount++;
+          if (freeSearchCount === 5) {
+            showPaymentModal();
+          }
+          return true;
+        } else {
+          showPaymentModal();
+          return false;
+        }
+      }
+
+      function showPaymentModal() {
+        // Show payment modal with contact and directions
+        let modal = document.getElementById('paymentModal');
+        if (modal) {
+          modal.style.display = 'flex';
+        } else {
+          alert('Contact: 0739864044\nDirections: Pay KES 20 via Mpesa to get unlimited access.');
+        }
+      }
+
+      function verifyPayment() {
+        // Simulate payment verification
+        if (currentUser) {
+          paidUsers[currentUser] = true;
+          localStorage.setItem('paidUsers', JSON.stringify(paidUsers));
+          alert('Payment received! You now have unlimited searches.');
+          let modal = document.getElementById('paymentModal');
+          if (modal) modal.style.display = 'none';
+        }
+      }
+
+      // Disable search modal if not logged in
+      window.addEventListener('DOMContentLoaded', function() {
+        const searchSection = document.querySelector('.search-section');
+        if (searchSection) {
+          // Add instruction overlay
+          let instruction = document.createElement('div');
+          instruction.id = 'searchInstruction';
+          instruction.style = 'position:absolute; top:0; left:0; width:100%; height:100%; background:rgba(44,62,80,0.85); color:#fff; display:flex; flex-direction:column; align-items:center; justify-content:center; z-index:100; font-size:1.2em; font-family:Montserrat,Arial,sans-serif; border-radius:18px;';
+          instruction.innerHTML = '<span style="margin-bottom:1em;">Please <strong>login</strong> or <strong>register</strong> to access the search modal.</span>';
+          if (!currentUser) {
+            searchSection.appendChild(instruction);
+            searchSection.style.pointerEvents = 'none';
+            searchSection.style.opacity = '0.5';
+          }
+          // Remove instructions and enable access after login/register
+          function enableSearchAccess() {
+            if (document.getElementById('searchInstruction')) {
+              document.getElementById('searchInstruction').remove();
+            }
+            searchSection.style.pointerEvents = 'auto';
+            searchSection.style.opacity = '1';
+          }
+          // Listen for login/register
+          let observer = new MutationObserver(function() {
+            if (currentUser) {
+              enableSearchAccess();
+            }
+          });
+          observer.observe(searchSection, { childList: true, subtree: true });
+          // Also enable on login/register functions
+          window.enableSearchAccess = enableSearchAccess;
+        }
+      });
+
+      function searchPest() {
+        const query = document.getElementById('pestInput').value.toLowerCase();
+        const resultsDiv = document.getElementById('results');
+        resultsDiv.innerHTML = '';
+        // Fuzzy match for misspellings
+        const matches = pestData.filter(item => {
+          const allTerms = [item.crop, item.indigenousName, item.pest, ...(item.pesticides ? item.pesticides.map(p => p.name) : [])];
+          return allTerms.some(term => term && fuzzyMatch(term.toLowerCase(), query));
+        });
+        if (matches.length === 0) {
+          // Suggest closest spelling
+          const allTerms = pestData.flatMap(item => [item.crop, item.indigenousName, item.pest, ...(item.pesticides ? item.pesticides.map(p => p.name) : [])]);
+          const suggestion = getClosestSuggestion(query, allTerms);
+          resultsDiv.innerHTML = `<div class="result-card"><h3>No results found</h3><p>Did you mean: <strong>${suggestion}</strong>?</p></div>`;
+          return;
+        }
+        matches.forEach(item => {
+          let pesticidesHtml = '';
+          if (item.pesticides && item.pesticides.length > 0) {
+            pesticidesHtml = `<div class="result-section" style="margin-top:1em;">
+              <div style="font-weight:600; color:#388e3c; margin-bottom:0.5em; display:flex; align-items:center; gap:0.5em;">
+                <img src='https://img.icons8.com/color/32/000000/spray.png' alt='Pesticide Icon' style='height:22px;'> Pesticides
+              </div>
+              <ul style="margin:0; padding-left:1.2em;">`;
+            item.pesticides.forEach(p => {
+              pesticidesHtml += `<li style="margin-bottom:0.5em;">
+                <span style="font-weight:500; color:${p.type==='Organic'?'#4caf50':'#2196f3'};">${p.type}: ${p.name}</span>
+                <button onclick="showPesticideDetails('${p.name}')" style="margin-left:1em; background:#ffd600; color:#388e3c; border:none; border-radius:6px; padding:0.3em 1em; font-size:0.95em; font-weight:bold; cursor:pointer;">Details</button>
+              </li>`;
+            });
+            pesticidesHtml += '</ul></div>';
+          }
+          resultsDiv.innerHTML += `
+            <div class="result-card" style="font-family:'Montserrat', Arial, sans-serif;">
+              <div class="result-section" style="margin-bottom:1em;">
+                <div style="font-size:1.15em; font-weight:700; color:#4caf50; display:flex; align-items:center; gap:0.5em;">
+                  <img src='https://img.icons8.com/color/32/000000/plant-under-sun.png' alt='Crop Icon' style='height:22px;'> ${item.crop}${item.indigenousName ? ' (' + item.indigenousName + ')' : ''}
+                </div>
+                <div style="font-size:1.08em; font-weight:600; color:#2196f3; margin-top:0.3em; display:flex; align-items:center; gap:0.5em;">
+                  <img src='https://img.icons8.com/color/32/000000/bug.png' alt='Pest Icon' style='height:22px;'> ${item.pest}
+                </div>
+              </div>
+              <div class="result-section" style="margin-bottom:1em;">
+                <div style="font-weight:600; color:#388e3c; margin-bottom:0.5em; display:flex; align-items:center; gap:0.5em;">
+                  <img src='https://img.icons8.com/color/32/000000/info.png' alt='Description Icon' style='height:22px;'> Description
+                </div>
+                <div style="font-size:1em; color:#222;">${item.description}</div>
+              </div>
+              <div class="result-section" style="margin-bottom:1em;">
+                <div style="font-weight:600; color:#388e3c; margin-bottom:0.5em; display:flex; align-items:center; gap:0.5em;">
+                  <img src='https://img.icons8.com/color/32/000000/maintenance.png' alt='Management Icon' style='height:22px;'> Management
+                </div>
+                <ul style="margin:0; padding-left:1.2em;">${item.management.map(m => `<li style='margin-bottom:0.4em;'>${m}</li>`).join('')}</ul>
+              </div>
+              ${pesticidesHtml}
+            </div>
+          `;
+        });
+      }
+
+      // Fuzzy match function for misspellings
+      function fuzzyMatch(term, query) {
+        if (!query) return false;
+        if (term.includes(query)) return true;
+        // Levenshtein distance for fuzzy matching
+        return levenshtein(term, query) <= 2;
+      }
+      function levenshtein(a, b) {
+        const matrix = Array(a.length + 1).fill(null).map(() => Array(b.length + 1).fill(null));
+        for (let i = 0; i <= a.length; i++) matrix[i][0] = i;
+        for (let j = 0; j <= b.length; j++) matrix[0][j] = j;
+        for (let i = 1; i <= a.length; i++) {
+          for (let j = 1; j <= b.length; j++) {
+            const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+            matrix[i][j] = Math.min(
+              matrix[i - 1][j] + 1,
+              matrix[i][j - 1] + 1,
+              matrix[i - 1][j - 1] + cost
+            );
+          }
+        }
+        return matrix[a.length][b.length];
+      }
+      function getClosestSuggestion(query, terms) {
+        let minDist = Infinity;
+        let best = '';
+        terms.forEach(term => {
+          if (!term) return;
+          const dist = levenshtein(term.toLowerCase(), query);
+          if (dist < minDist) {
+            minDist = dist;
+            best = term;
+          }
+        });
+        return best || 'No suggestion';
+      }
+
+      function showPayment() {
+        document.getElementById('paymentModal').style.display = 'flex';
+        document.getElementById('loginBtn').style.display = isPaidUser ? 'none' : 'inline-block';
+        document.getElementById('verifyBtn').style.display = isPaidUser && !isPaymentVerified ? 'inline-block' : 'none';
+      }
+      function closePayment() {
+        document.getElementById('paymentModal').style.display = 'none';
+      }
+
+      // Simulate login (for demo purposes)
+      function loginAndPay() {
+        isPaidUser = true;
+        freeSearchCount = 0;
+        showPayment();
+      }
+
+      // Simulate payment verification
+      function verifyPayment() {
+        isPaymentVerified = true;
+        closePayment();
+        alert("Payment received! You now have unlimited searches.");
+      }
+
+      // Get all unique crops, indigenous names, pests, and diseases for suggestions
+      function getAllSuggestions() {
+        const suggestions = new Set();
+        pestData.forEach(item => {
+          suggestions.add(item.crop);
+          if (item.indigenousName) suggestions.add(item.indigenousName);
+          suggestions.add(item.pest);
+        });
+        return Array.from(suggestions);
+      }
+
+      // Show suggestions as user types
+      function showSuggestions() {
+        const input = document.getElementById('pestInput').value.toLowerCase();
+        const suggestionsDiv = document.getElementById('suggestions');
+        if (!input) {
+          suggestionsDiv.style.display = 'none';
+          return;
+        }
+        const allSuggestions = getAllSuggestions();
+        const filtered = allSuggestions.filter(s => s.toLowerCase().startsWith(input));
+        if (filtered.length === 0) {
+          suggestionsDiv.style.display = 'none';
+          return;
+        }
+  suggestionsDiv.innerHTML = filtered.map(s => `<div class="suggestion-item" onclick="selectSuggestion('${s}')" style="padding:0.7em 1em; margin:0.3em 0; border-radius:8px; background:#fff; box-shadow:0 1px 4px #a5d6a7; cursor:pointer; transition:background 0.2s; font-family:'Montserrat',cursive; font-size:1.08em; color:#388e3c; font-weight:bold;">${s}</div>`).join('');
+  suggestionsDiv.style.display = 'block';
+    }
+
+    // When a suggestion is clicked, fill the input
+    function selectSuggestion(suggestion) {
+      document.getElementById('pestInput').value = suggestion;
+      document.getElementById('suggestions').style.display = 'none';
+      searchPest();
+    }
+
+    function showPesticideDetails(pesticideName) {
+      // Find the pesticide info from the current search results if available
+      const query = document.getElementById('pestInput').value.toLowerCase();
+      let found = null;
+      let allPesticides = { organic: [], artificial: [] };
+      let dholuoHerbNames = {
+    "Neem oil": "yath mar mwarubaine",
+    "Neem extract": "yien mar mwarubaine",
+        "Bacillus thuringiensis (Bt)": "Bakteria mar Bt",
+        "Sulfur fungicide": "Sulfur asili",
+        "Potassium bicarbonate": "Potassium bicarbonate",
+        "Insecticidal soap": "Sabuni mar ketho joricho",
+        "Horticultural oil": "Mafuta mar yath",
+        "Copper-based fungicide": "Shaba",
+        "Copper oxychloride": "Shaba",
+        "Pyrethrin": "Maua mar Pyrethrum",
+        "Bt spray": "Bakteria mar Bt",
+        "Kaligreen": "Kaligreen",
+        "Elemental sulfur": "Sulfur asili",
+        "Sabuni mar ketho joricho": "Sabuni mar ketho joricho",
+        "Mafuta mar yath": "Mafuta mar yath"
+      };
+      pestData.forEach(item => {
+        if (item.pesticides) {
+          item.pesticides.forEach(p => {
+            if (p.name.toLowerCase() === pesticideName.toLowerCase()) {
+              found = { info: pesticideInfo[p.name], context: item };
+            }
+            if (p.type === "Organic" && !allPesticides.organic.includes(p.name)) {
+              allPesticides.organic.push(p.name);
+            }
+            if (p.type === "Artificial" && !allPesticides.artificial.includes(p.name)) {
+              allPesticides.artificial.push(p.name);
+            }
+          });
+        }
+      });
+      const modal = document.getElementById('pesticideDetailsModal');
+      const content = document.getElementById('pesticideDetailsContent');
+      if (!found || !found.info) {
+        content.innerHTML = `<h2 style=\"color:#388e3c;\">${pesticideName}</h2><p>No details available.</p><button onclick=\"closePesticideDetails()\" style=\"background:#ffd600; color:#388e3c; border:none; border-radius:8px; padding:0.7em 1.5em; font-size:1em; font-weight:bold; margin-top:1em;\">Close</button>`;
+      } else {
+        const info = found.info;
+  let organicList = allPesticides.organic.length > 0 ? `<ul>${allPesticides.organic.map(p => `<li>${p} <span style='color:#388e3c;'>(Dholuo: ${dholuoHerbNames[p] ? dholuoHerbNames[p] : 'Not available'})</span></li>`).join('')}</ul>` : 'None';
+        let artificialList = allPesticides.artificial.length > 0 ? `<ul>${allPesticides.artificial.map(p => `<li>${p}</li>`).join('')}</ul>` : 'None';
+        content.innerHTML = `
+          <h2 style=\"color:#388e3c; font-size:2em; font-family:'Montserrat',cursive; margin-bottom:0.5em;\">${pesticideName}</h2>
+          <div style=\"background:linear-gradient(90deg,#e8f5e9 0%,#ffd600 100%); border-radius:12px; box-shadow:0 2px 8px #a5d6a7; padding:1em 1.2em; margin-bottom:1em; font-size:1.1em;\">
+            <strong style=\"color:#388e3c; font-size:1.15em;\">Used for:</strong><br>
+            <span style=\"color:#388e3c; font-weight:bold;\">${found.context.crop}${found.context.indigenousName ? ' (' + found.context.indigenousName + ')' : ''} - ${found.context.pest}</span>
+          </div>
+          <div style=\"background:#fffde9; border-radius:10px; box-shadow:0 1px 4px #ffd600; padding:1em 1.2em; margin-bottom:1em; font-size:1.08em;\">
+            <strong style=\"color:#388e3c; font-size:1.12em;\">Description:</strong><br>
+            <span>${info.description.en}</span>
+          </div>
+          <div style=\"background:linear-gradient(90deg,#ffd600 0%,#e8f5e9 100%); border-radius:10px; box-shadow:0 1px 4px #a5d6a7; padding:1em 1.2em; margin-bottom:1em; font-size:1.08em;\">
+            <strong style=\"color:#388e3c; font-size:1.12em;\">Other Names:</strong><br>
+            <span>${info.otherNames.en.join(', ')}</span>
+          </div>
+          <div style=\"background:#e8f5e9; border-radius:10px; box-shadow:0 1px 4px #ffd600; padding:1em 1.2em; margin-bottom:1em; font-size:1.08em;\">
+            <strong style=\"color:#388e3c; font-size:1.12em;\">Usage:</strong><br>
+            <span>${info.usage.en}</span>
+          </div>
+          <div style=\"background:linear-gradient(90deg,#ffd600 0%,#e8f5e9 100%); border-radius:10px; box-shadow:0 1px 4px #a5d6a7; padding:1em 1.2em; margin-bottom:1em; font-size:1.08em;\">
+            <strong style=\"color:#388e3c; font-size:1.12em;\">Recommended Amount:</strong><br>
+            <span>${info.amount.en}</span>
+          </div>
+          <div style=\"background:#fffde9; border-radius:10px; box-shadow:0 1px 4px #ffd600; padding:1em 1.2em; margin-bottom:1em; font-size:1.08em;\">
+            <strong style=\"color:#388e3c; font-size:1.12em;\">All Possible Organic Pesticides:</strong><br>
+            ${organicList}
+          </div>
+          <div style=\"background:linear-gradient(90deg,#e8f5e9 0%,#ffd600 100%); border-radius:10px; box-shadow:0 1px 4px #a5d6a7; padding:1em 1.2em; margin-bottom:1em; font-size:1.08em;\">
+            <strong style=\"color:#388e3c; font-size:1.12em;\">All Possible Artificial Pesticides:</strong><br>
+            ${artificialList}
+          </div>
+          <button onclick=\"closePesticideDetails()\" style=\"background:#ffd600; color:#388e3c; border:none; border-radius:8px; padding:0.7em 1.5em; font-size:1.1em; font-weight:bold; margin-top:1em; box-shadow:0 2px 8px #a5d6a7;\">Close</button>
+        `;
+      }
+      modal.style.display = 'flex';
+    }
+
+    function closePesticideDetails() {
+      document.getElementById('pesticideDetailsModal').style.display = 'none';
+    }
+
+    function searchPestWithTrial() {
+      let loggedInUser = localStorage.getItem('loggedInUser');
+      if (!loggedInUser) {
+        showAuthModal('login');
+        return;
+      }
+      searchPest();
+    }
+  </script>
+  <link href="https://fonts.googleapis.com/css2?family=Pacifico&family=Montserrat:wght@700&family=Roboto:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    /* Android-specific block sizing for consistency with payment modal */
+    @media only screen and (max-width: 600px) and (pointer: coarse) {
+      .container,
+      .attractive-aim,
+      .attractive-slogan,
+      .search-section,
+      .results,
+      footer > div,
+      #chatModal > div,
+      #pesticideDetailsContent {
+        max-width: 350px !important;
+        padding: 2em !important;
+        border-radius: 16px !important;
+        margin-left: auto !important;
+        margin-right: auto !important;
+        box-sizing: border-box !important;
+      }
+    }
+    html, body {
+  width: 100%;
+  min-height: 100vh;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  font-family: Arial, sans-serif;
+  background: #f4f8ec;
+  color: #2e4d1a;
+  -webkit-text-size-adjust: 100%;
+  -ms-text-size-adjust: 100%;
+    }
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #f4f8ec;
+      color: #2e4d1a;
+    }
+    header {
+      background: #4caf50;
+      color: #fff;
+      padding: 2em 0 1em 0;
+      text-align: center;
+      box-shadow: 0 4px 24px #a5d6a7;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+    header h1 {
+      margin: 0 0 0.3em 0;
+      font-size: 2.5em;
+      font-weight: bold;
+    }
+    header p {
+      font-size: 1.2em;
+      margin: 0;
+      color: #e8f5e9;
+    }
+    .container {
+      width: 95vw;
+      max-width: 900px;
+      margin: 2em auto;
+      background: #fff;
+      border-radius: 18px;
+      box-shadow: 0 4px 24px #c8e6c9;
+      padding: 2em;
+      box-sizing: border-box;
+      overflow-x: auto;
+    }
+    .search-section {
+      margin-bottom: 2em;
+      text-align: center;
+      width: 100%;
+      max-width: 500px;
+      min-width: 220px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    .search-section input {
+      padding: 0.7em;
+      border-radius: 8px;
+      border: 1px solid #4caf50;
+      font-size: 1em;
+      width: 100%;
+      max-width: 400px;
+      min-width: 120px;
+      box-sizing: border-box;
+    }
+    .search-section button {
+      background: #4caf50;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 0.7em 1.5em;
+      font-size: 1em;
+      cursor: pointer;
+      font-weight: bold;
+      box-shadow: 0 2px 8px #a5d6a7;
+      transition: background 0.2s;
+      width: 100%;
+      max-width: 220px;
+      min-width: 100px;
+      margin-top: 1em;
+      margin-left: 0;
+      box-sizing: border-box;
+    }
+    .results {
+      margin-top: 2em;
+      width: 100%;
+      box-sizing: border-box;
+      overflow-x: auto;
+    }
+    .result-card {
+      background: #e8f5e9;
+      border-radius: 14px;
+      box-shadow: 0 2px 8px #a5d6a7;
+      margin-bottom: 1.5em;
+      padding: 1.5em;
+      width: 100%;
+      box-sizing: border-box;
+      min-width: 220px;
+      max-width: 100vw;
+      overflow-x: auto;
+    }
+    footer {
+      text-align: center;
+      color: #4caf50;
+      padding: 2em 0 1em 0;
+      margin-top: 3em;
+      background: #e8f5e9;
+      border-top: 2px solid #a5d6a7;
+      font-size: 1.1em;
+      width: 100vw;
+      box-sizing: border-box;
+      overflow-x: auto;
+    }
+    .suggestion-item {
+      padding: 0.6em 1em;
+      cursor: pointer;
+    }
+    .suggestion-item:hover {
+      background: #e8f5e9;
+    }
+
+    /* Always-visible workspace image */
+    #alwaysVisibleImageFrame {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      z-index: 99999;
+      padding: 8px;
+      border-radius: 24px;
+      background: linear-gradient(135deg,#ffd600 0%,#4caf50 100%);
+      box-shadow: 0 4px 16px #a5d6a7;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    #alwaysVisibleImageFrame img {
+      width: 120px;
+      height: auto;
+      border-radius: 16px;
+      box-shadow: 0 2px 8px #388e3c;
+      border: 4px solid #fff;
+      display: block;
+    }
+
+    /* Pesticide details modal CSS */
+    #pesticideDetailsModal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(44,62,80,0.8);
+      z-index: 9999;
+      align-items: center;
+      justify-content: center;
+    }
+    #pesticideDetailsContent {
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 4px 24px #a5d6a7;
+  padding: 2em;
+  max-width: 400px;
+  margin: auto;
+  text-align: center;
+  max-height: 80vh;
+  overflow-y: auto;
+    }
+
+    /* Responsive styles */
+    @media (max-width: 900px) {
+      .container {
+        padding: 1em;
+        width: 99vw;
+        max-width: 100vw;
+      }
+      .search-section {
+        max-width: 99vw;
+        min-width: 120px;
+        padding: 0.5em;
+      }
+      .search-section input {
+        width: 99vw;
+        min-width: 80px;
+        font-size: 1em;
+      }
+      .search-section button {
+        width: 99vw;
+        min-width: 80px;
+        margin-left: 0;
+        margin-top: 1em;
+        font-size: 1em;
+      }
+      .result-card {
+        min-width: 80px;
+        max-width: 99vw;
+        padding: 1em;
+        font-size: 0.98em;
+      }
+      footer {
+        padding: 1em 0 0.5em 0;
+        font-size: 0.98em;
+        min-width: 80px;
+        max-width: 99vw;
+      }
+      header h1 {
+        font-size: 2em;
+      }
+      .attractive-slogan, .attractive-aim {
+        font-size: 1em !important;
+        padding: 1em 0.7em !important;
+        flex-direction: column !important;
+        gap: 0.7em !important;
+      }
+      .attractive-aim img, .attractive-slogan img {
+        height: 48px !important;
+        margin-right: 0 !important;
+      }
+      .attractive-aim span, .attractive-slogan span {
+        font-size: 1em !important;
+        text-align: center !important;
+      }
+    }
+
+    @media (max-width: 600px) {
+      html, body {
+        font-size: 0.98em;
+      }
+      .container {
+        padding: 0.5em;
+        width: 100vw;
+        max-width: 100vw;
+      }
+      .search-section {
+        padding: 0.3em;
+      }
+      .result-card {
+        padding: 0.7em;
+        font-size: 0.95em;
+      }
+      .attractive-slogan, .attractive-aim {
+        font-size: 0.95em !important;
+        padding: 0.7em 0.3em !important;
+      }
+      .attractive-aim img, .attractive-slogan img {
+        height: 36px !important;
+      }
+      .attractive-aim span, .attractive-slogan span {
+        font-size: 0.95em !important;
+      }
+      header h1 {
+        font-size: .3em;
+      }
+      footer {
+        font-size: 0.95em;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- Sent Confirmation Modal -->
+  <div id="sentModal" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(44,62,80,0.15); z-index:100000; align-items:center; justify-content:center;">
+    <div style="background:#4caf50; color:#fff; border-radius:16px; box-shadow:0 4px 24px #a5d6a7; padding:1.5em 2.5em; max-width:300px; margin:auto; text-align:center; font-family:'Montserrat',Arial,sans-serif; font-size:1.2em; font-weight:bold;">
+      Message sent!
+    </div>
+  </div>
+  <header style="width:100vw; min-width:100vw; color:#fff; box-shadow:0 4px 24px #a5d6a7; background: linear-gradient(135deg, #ffd600 0%, #4caf50 100%), url('https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=1200&q=80'); background-size: cover; background-position: center; background-blend-mode: multiply; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:2em 0; gap:2em;">
+    <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; width:100vw; gap:2em;">
+  <div style="background:rgba(255,255,255,0.55); color:#222; font-family:'Montserrat', Arial, sans-serif; font-size:1em; font-weight:600; border-radius:16px; box-shadow:0 4px 24px #a5d6a7; padding:2em; display:flex; align-items:center; justify-content:center; max-width:350px; width:100%; min-width:220px; box-sizing:border-box; letter-spacing:0.02em; margin-top:-2cm; margin-bottom:0.3em;">
+  <span style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:0.5em;">
+    <span style="font-size:2.2em; font-weight:900; color:#ffd600; text-shadow:0 2px 16px #388e3c, 0 0px 2px #222; letter-spacing:0.06em; text-align:center; font-family:'Pacifico',cursive; position:relative;">
+      <img src="https://img.icons8.com/color/64/000000/plant-under-sun.png" alt="Plant Icon" style="height:40px; vertical-align:middle; margin-right:0.3em; margin-bottom:-0.3em; filter:drop-shadow(0 2px 8px #388e3c);">
+      Smart Crop Pest Finder
+      <img src="https://img.icons8.com/color/64/000000/bug.png" alt="Bug Icon" style="height:40px; vertical-align:middle; margin-left:0.3em; margin-bottom:-0.3em; filter:drop-shadow(0 2px 8px #ffd600);">
+    </span>
+    <span style="font-size:1.1em; color:#388e3c; font-weight:700; text-shadow:0 2px 8px #ffd600; letter-spacing:0.03em; text-align:center; font-family:'Montserrat', Arial, sans-serif;">Empowering Your Harvest & Protecting Your Future</span>
+  </span>
+    </div>
+  <p style="font-size:1.3em; margin:0; color:#222; text-align:center; font-weight:700; text-shadow:0 2px 8px #ffd600, 0 0px 2px #4caf50; letter-spacing:0.03em; background:rgba(255,255,255,0.45); border-radius:12px; padding:0.5em 1em;">Empowering farmers to identify, research, and manage crop pests effectively</p>
+  <div class="attractive-aim" style="background:rgba(255,255,255,0.55); color:#222; font-family:'Montserrat', Arial, sans-serif; font-size:1em; font-weight:600; border-radius:16px; box-shadow:0 4px 24px #a5d6a7; padding:2em; display:flex; align-items:center; gap:1em; max-width:350px; width:100%; min-width:220px; box-sizing:border-box; letter-spacing:0.02em; margin-top:1em;">
+  <img src="https://img.icons8.com/color/96/000000/plant-under-sun.png" alt="Relevant Aim Image" style="height:50px; border-radius:14px; box-shadow:0 2px 12px #fff; margin-right:0.7em;">
+  <span style="font-family:'Montserrat', Arial, sans-serif; color:#111; font-size:1.25em; font-weight:800; line-height:1.6; text-shadow:none; letter-spacing:0.03em;"> <strong style="color:#111; font-size:1.3em; font-family:'Montserrat', Arial, sans-serif;">Aim:</strong> Empower farmers and researchers to access <span style="color:#111; font-weight:900;">reliable crop pest information</span>, promote <span style="color:#111; font-weight:900;">sustainable agriculture</span>, and protect harvests for a <span style="color:#111; font-weight:900;">better future</span>. </span>
+    </div>
+    <!-- Update Website Button Above Login Block -->
+    <div style="width:100%; display:flex; justify-content:center; align-items:center; margin-bottom:1em; background:rgba(255,255,255,0.45); border-radius:12px;">
+      <button onclick="window.location.reload()" style="background:rgba(255,255,255,0.65); color:#222; border:none; border-radius:12px; padding:0.7em 1.7em; font-family:'Montserrat',Arial,sans-serif; font-size:1.08em; font-weight:900; box-shadow:0 4px 16px #a5d6a7; cursor:pointer; display:flex; align-items:center; gap:0.7em; transition:transform 0.18s;" onmouseover="this.style.transform='scale(1.08)'" onmouseout="this.style.transform='scale(1)'"><img src="https://img.icons8.com/fluency/32/000000/refresh.png" alt="Refresh" style="height:24px; width:24px; vertical-align:middle;"> Update Website</button>
+    </div>
+    <!-- Login Modal Block -->
+  <div id="loginModalHeader" style="background:rgba(255,255,255,0.55); color:#222; font-family:'Montserrat', Arial, sans-serif; font-size:1.15em; font-weight:700; border-radius:16px; box-shadow:0 4px 24px #a5d6a7; padding:2em; max-width:350px; width:100%; min-width:220px; box-sizing:border-box; margin-top:1em; display:flex; flex-direction:column; align-items:center; gap:1em;">
+      <img src="https://img.icons8.com/color/48/000000/login-rounded-right.png" alt="Login Icon" style="height:36px; border-radius:12px; box-shadow:0 2px 8px #fff; margin-bottom:0.5em;">
+      <span style="font-size:1.2em; font-weight:900; color:#ffd600;">Login</span>
+    <input type="text" placeholder="Username" style="padding:0.7em; border-radius:8px; border:1px solid #ffd600; font-size:1em; width:90%; max-width:220px; margin-bottom:0.7em; background:#222; color:#ffd600;">
+    <input type="password" placeholder="Password" style="padding:0.7em; border-radius:8px; border:1px solid #ffd600; font-size:1em; width:90%; max-width:220px; margin-bottom:1em; background:#222; color:#ffd600;">
+    <button onclick="loginUser()" style="background:linear-gradient(90deg,#222 0%,#444 100%); color:#ffd600; border:none; border-radius:8px; padding:0.7em 1.5em; font-family:'Montserrat',Arial,sans-serif; font-size:1em; font-weight:bold; box-shadow:0 2px 8px #ffd600; cursor:pointer;">Login</button>
+    </div>
+    <!-- Register Modal Block -->
+  <div id="registerModalHeader" style="background:rgba(255,255,255,0.55); color:#222; font-family:'Montserrat', Arial, sans-serif; font-size:1.15em; font-weight:700; border-radius:16px; box-shadow:0 4px 24px #a5d6a7; padding:2em; max-width:350px; width:100%; min-width:220px; box-sizing:border-box; margin-top:1em; display:flex; flex-direction:column; align-items:center; gap:1em;">
+    <div style="background:#222; color:#ffd600; font-size:1em; font-weight:600; border-radius:10px; box-shadow:0 2px 8px #ffd600; padding:0.7em 1em; margin-bottom:0.7em; text-align:center;">Please provide either a valid <strong>phone number</strong> or <strong>email</strong> during registration.</div>
+    <img src="https://img.icons8.com/color/48/000000/add-user-group-man-man.png" alt="Register Icon" style="height:36px; border-radius:12px; box-shadow:0 2px 8px #fff; margin-bottom:0.5em;">
+    <span style="font-size:1.2em; font-weight:900; color:#ffd600;">Register</span>
+  <input type="text" placeholder="Username" style="padding:0.7em; border-radius:8px; border:1px solid #ffd600; font-size:1em; width:90%; max-width:220px; margin-bottom:0.7em; background:#222; color:#ffd600;">
+  <input type="email" placeholder="Email (optional)" style="padding:0.7em; border-radius:8px; border:1px solid #ffd600; font-size:1em; width:90%; max-width:220px; margin-bottom:0.7em; background:#222; color:#ffd600;">
+  <input type="tel" placeholder="Phone number (optional)" style="padding:0.7em; border-radius:8px; border:1px solid #ffd600; font-size:1em; width:90%; max-width:220px; margin-bottom:0.7em; background:#222; color:#ffd600;">
+  <input type="file" id="profilePicInput" accept="image/*" style="margin-bottom:0.7em;">
+  <input type="password" placeholder="Password" style="padding:0.7em; border-radius:8px; border:1px solid #ffd600; font-size:1em; width:90%; max-width:220px; margin-bottom:1em; background:#222; color:#ffd600;">
+  <button onclick="registerUser()" style="background:linear-gradient(90deg,#222 0%,#444 100%); color:#ffd600; border:none; border-radius:8px; padding:0.7em 1.5em; font-family:'Montserrat',Arial,sans-serif; font-size:1em; font-weight:bold; box-shadow:0 2px 8px #ffd600; cursor:pointer;">Register</button>
+    </div>
+    </div>
+    </div>
+    <div class="attractive-slogan" style="background:linear-gradient(90deg,#ffd600 0%,#4caf50 100%); color:#fff; font-family:'Montserrat', Arial, sans-serif; font-size:1em; font-weight:700; border-radius:16px; box-shadow:0 4px 16px #a5d6a7; padding:2em; display:flex; align-items:center; gap:1em; max-width:350px; width:100%; min-width:220px; box-sizing:border-box; letter-spacing:0.02em; margin-top:1em;">
+  <!-- Slogan block removed from header -->
+    </div>
+  </div>
+  </header>
+
+  <!-- New Slogan Block Below Header, Above Aim -->
+  <div style="width:100%; display:flex; justify-content:center; margin-top:1.5em;">
+    <div class="attractive-slogan" style="background:linear-gradient(90deg,#ffd600 0%,#4caf50 100%); color:#fff; font-family:'Montserrat', Arial, sans-serif; font-size:1.5em; font-weight:700; border-radius:16px; box-shadow:0 4px 16px #a5d6a7; padding:1.2em 2em; display:flex; align-items:center; gap:1.2em; max-width:800px; width:100%; min-width:220px; box-sizing:border-box; letter-spacing:0.02em;">
+      <img src="https://img.icons8.com/color/64/000000/handshake.png" alt="Slogan Image" style="height:48px; border-radius:12px; box-shadow:0 2px 8px #a5d6a7;">
+      <span style="font-family:'Montserrat', Arial, sans-serif; font-size:1.15em; font-weight:700; color:#fff; text-shadow:0 2px 8px #388e3c; letter-spacing:0.03em;">&#10024; Protecting Your Harvest, Securing Your Future. &#10024;</span>
+    </div>
+  </div>
+  <!-- New Aim Block Below Slogan -->
+  <div style="width:100%; display:flex; justify-content:center; margin-top:1.5em;">
+    <div class="attractive-aim" style="background:linear-gradient(90deg,#ffd600 0%,#4caf50 100%); color:#222; font-family:'Montserrat', Arial, sans-serif; font-size:1.22em; font-weight:600; border-radius:18px; box-shadow:0 6px 24px #a5d6a7; padding:1.7em 2.2em; display:flex; align-items:center; gap:1.2em; max-width:800px; width:100%; min-width:220px; box-sizing:border-box; letter-spacing:0.02em;">
+  <img src="https://img.icons8.com/color/96/000000/plant-under-sun.png" alt="Relevant Aim Image" style="height:70px; border-radius:14px; box-shadow:0 2px 12px #388e3c; margin-right:1em;">
+  <span style="font-family:'Montserrat', Arial, sans-serif; color:#222; font-size:1.15em; font-weight:600; line-height:1.6; text-shadow:0 1px 4px #388e3c; letter-spacing:0.02em;"> <strong style="color:#4caf50; font-size:1.18em; font-family:'Montserrat', Arial, sans-serif;">Aim:</strong> Empower farmers and researchers to access <span style="color:#4caf50; font-weight:700;">reliable crop pest information</span>, promote <span style="color:#388e3c; font-weight:700;">sustainable agriculture</span>, and protect harvests for a <span style="color:#388e3c; font-weight:700;">better future</span>. </span>
+    </div>
+  </div>
+  <div class="container">
+    <div class="search-section" style="position:relative; max-width:500px; margin:2em auto; background:linear-gradient(90deg,#e8f5e9 0%,#ffd600 100%); border-radius:18px; box-shadow:0 4px 24px #a5d6a7; padding:2em 2em 1.5em 2em; display:flex; flex-direction:column; align-items:center;">
+      <div style="font-family:'Montserrat','Pacifico',cursive; font-size:1.25em; color:#388e3c; font-weight:bold; margin-bottom:1em; text-align:center;">
+        <img src="https://img.icons8.com/color/48/000000/search--v1.png" alt="Search Icon" style="height:32px; vertical-align:middle; margin-right:0.5em;"> Search Crop, Pest, or Disease
+      </div>
+      <input type="text" id="pestInput" placeholder="Enter crop, tree fruit, vegetable, pest, or disease name" oninput="showSuggestions()" autocomplete="off" style="padding:0.9em; border-radius:10px; border:2px solid #4caf50; font-size:1.1em; width:100%; max-width:400px; min-width: 120px; margin-bottom:1em; box-shadow:0 2px 8px #a5d6a7;">
+      <button onclick="searchPestWithTrial()" style="background:linear-gradient(90deg,#ffd600 0%,#4caf50 100%); color:#fff; border:none; border-radius:10px; padding:0.9em 2em; font-size:1.1em; font-weight:bold; box-shadow:0 2px 8px #a5d6a7; cursor:pointer; margin-bottom:1em; transition:background 0.2s;">Search</button>
+  <div id="suggestions" class="suggestions" style="display:none; position:static; margin-top:1em; width:100%; max-width:400px; background:linear-gradient(90deg,#ffd600 0%,#e8f5e9 100%); border-radius:12px; box-shadow:0 2px 8px #a5d6a7; font-family:'Montserrat',cursive; font-size:1.08em; font-weight:bold; color:#388e3c; padding:0.7em 0.5em; z-index:100;">
+  </div>
+    </div>
+    <div class="results" id="results">
+      <!-- Results will appear here -->
+    </div>
+  </div>
+  <footer>
+    <div style="margin-bottom:1em; display:flex; flex-direction:column; align-items:center; justify-content:center;">
+      <!-- Logo for footer -->
+      <img src="https://img.icons8.com/color/64/000000/plant-under-sun.png" alt="Footer Logo" style="height:48px; vertical-align:middle; margin-bottom:0.7em;">
+    </div>
+    &copy; 2025 Crop Pest Research Portal. All rights reserved.<br>
+    <div style="width:100%; display:flex; justify-content:center; margin-top:1em;">
+      <div style="background:linear-gradient(90deg,#ffd600 0%,#4caf50 100%); color:#fff; font-family:'Montserrat','Pacifico',cursive; font-size:1.15em; font-weight:bold; border-radius:12px; box-shadow:0 2px 8px #a5d6a7; padding:0.7em 1.5em; display:flex; flex-direction:column; align-items:center; gap:1em; max-width:400px; margin:0 auto;">
+        <img src="https://img.icons8.com/color/48/000000/user-male-circle.png" alt="Creator Icon" style="height:32px; border-radius:8px; box-shadow:0 1px 4px #a5d6a7; margin-bottom:0.5em;">
+        <span style="text-align:center;">Created by Odongo Morgan</span>
+        <div class="attractive-slogan" style="background:linear-gradient(90deg,#ffd600 0%,#4caf50 100%); color:#fff; font-family:'Montserrat', Arial, sans-serif; font-size:1.15em; font-weight:900; border-radius:16px; box-shadow:0 4px 16px #a5d6a7; padding:1.2em 2em; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:0.7em; max-width:400px; width:100%; min-width:220px; box-sizing:border-box; letter-spacing:0.03em; margin-top:1em;">
+          <!-- Empty block removed from header -->
+        </div>
+      </div>
+    </div>
+    <span style="color:#388e3c; font-size:1.15em; font-family:'Montserrat',Arial,sans-serif; font-weight:bold; background:rgba(76,175,80,0.12); border-radius:8px; padding:0.4em 1em; display:inline-block; margin-top:0.7em;">
+      <span style="color:#ffd600;">Founder:</span> Odongo Morgan
+    </span>
+    <br>
+    <div style="width:100%; display:flex; justify-content:center; margin-top:1em;">
+      <div style="background:linear-gradient(90deg,#222 0%,#444 100%); color:#ffd600; font-family:'Montserrat','Pacifico',cursive; font-size:1.15em; font-weight:bold; border-radius:14px; box-shadow:0 2px 8px #a5d6a7; padding:1em 2em; display:flex; align-items:center; gap:2em; max-width:600px;">
+        <img src="https://img.icons8.com/color/48/000000/contacts.png" alt="Contacts Icon" style="height:32px; border-radius:8px; box-shadow:0 1px 4px #a5d6a7; margin-right:0.7em;">
+        <div style="display:flex; flex-direction:column; gap:0.7em;">
+          <a href="mailto:dickodongo90@gmail.com" style="text-decoration:none; color:#ffd600; display:flex; align-items:center; gap:0.5em; font-family:'Montserrat',cursive; font-size:1.08em; font-weight:bold;">
+            <img src="https://img.icons8.com/color/32/000000/new-post.png" alt="Email" style="height:22px;"> dickodongo90@gmail.com
+          </a>
+          <a href="tel:0739864044" style="text-decoration:none; color:#ffd600; display:flex; align-items:center; gap:0.5em; font-family:'Montserrat',cursive; font-size:1.08em; font-weight:bold;">
+            <img src="https://img.icons8.com/color/32/000000/phone.png" alt="Contact" style="height:22px;"> 0739864044
+          </a>
+        </div>
+      </div>
+    </div>
+    <div style="margin:2em auto 0 auto; max-width:400px; background:#fffde9; border:2px solid #ffd600; border-radius:14px; box-shadow:0 2px 8px #a5d6a7; padding:1.5em; text-align:center;">
+      <button onclick="showPayment()" style="background:#ffd600; color:#388e3c; border:none; border-radius:8px; padding:0.7em 1.5em; font-family:'Montserrat',Arial,sans-serif; font-size:1.1em; font-weight:bold; box-shadow:0 2px 8px #a5d6a7; cursor:pointer; margin-bottom:1em;">
+        Make Payment
+      </button>
+      <div style="border-top:2px dashed #388e3c; margin:1em 0;"></div>
+      <div style="font-family:'Montserrat',Arial,sans-serif; font-size:1em; text-align:left;">
+          <div style="background:linear-gradient(90deg,#ffd600 0%,#4caf50 100%); border-radius:10px; padding:1em; box-shadow:0 2px 8px #a5d6a7; margin-bottom:1em;">
+                <strong style="color:#388e3c; font-size:1.15em;">Accepted Payment Method:</strong>
+                <ul style="margin:0.7em 0 0 1.2em; color:#388e3c; font-size:1.1em; font-weight:bold;">
+                  <li style="margin-bottom:0.5em; cursor:pointer;" onclick="selectPaymentMethod('Mpesa')">
+                    <img src="https://upload.wikimedia.org/wikipedia/commons/4/4e/M-PESA_Logo.png" alt="Mpesa" style="height:22px; vertical-align:middle; margin-right:0.5em;"> Mpesa
+                  </li>
+                </ul>
+                <div style="margin-top:1em; color:#388e3c; font-size:1em; background:#fffde9; border-radius:8px; padding:1em; box-shadow:0 2px 8px #a5d6a7;">
+                  <strong>Steps to pay with Mpesa:</strong>
+                  <ol style="margin-top:0.7em; margin-bottom:0.7em; text-align:left;">
+                    <li>Go to your Mpesa menu on your phone.</li>
+                    <li>Select <strong>Lipa na Mpesa</strong>.</li>
+                    <li>Choose <strong>Send Money</strong>.</li>
+                    <li>Enter the number <strong>0739864044</strong>.</li>
+                    <li>Enter the amount <strong>KES 20</strong>.</li>
+                    <li>Confirm and send.</li>
+                    <li>After payment, click <strong>Verify Payment</strong> to get access.</li>
+                  </ol>
+                </div>
+                <div id="phoneInputSection" style="display:none; margin-top:1em; text-align:center;">
+                  <label for="phoneInput" style="color:#388e3c; font-weight:bold; font-size:1.05em;">Enter your phone number:</label><br>
+                  <input type="tel" id="phoneInput" placeholder="e.g. 07XXXXXXXX" style="margin-top:0.5em; padding:0.5em; border-radius:8px; border:1px solid #4caf50; font-size:1em; width:70%; max-width:220px;" oninput="onPhoneInputChange()">
+                  <br>
+                  <button id="sendPaymentBtn" onclick="sendPaymentPrompt()" style="display:none; background:#4caf50; color:#fff; border:none; border-radius:8px; padding:0.7em 1.5em; font-family:'Montserrat',Arial,sans-serif; font-size:1em; font-weight:bold; box-shadow:0 2px 8px #a5d6a7; cursor:pointer; margin-top:1em;">Send Payment Prompt</button>
+                </div>
+            <div style="margin-top:1em; color:#388e3c; font-size:1.1em; text-align:center;">
+              <span style="background:#ffd600; color:#388e3c; border-radius:8px; padding:0.4em 1em; font-weight:bold; box-shadow:0 2px 8px #a5d6a7;">Pay Only <span style="color:#4caf50; font-size:1.2em;">KES 20</span> for full access!</span>
+            </div>
+            <div style="margin-top:0.7em; color:#ffd600; font-weight:bold; text-align:center; font-size:1.15em;">
+              Pay to: <span style="color:#388e3c;">0739864044</span>
+            </div>
+            <div style="margin-top:0.5em; color:#388e3c; font-size:0.95em; text-align:center;">(Real money payment, instant access after verification)</div>
+          </div>
+      </div>
+    </div>
+    <div id="paymentModal" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(44,62,80,0.35); z-index:9999; align-items:center; justify-content:center;">
+  <div style="background:#fff; border-radius:16px; box-shadow:0 4px 24px #a5d6a7; padding:2em; max-width:350px; margin:auto; text-align:center; max-height:80vh; overflow-y:auto;">
+        <h2 style="color:#388e3c; font-family:'Montserrat',Arial,sans-serif;">Payment Details</h2>
+        <p style="font-size:1.1em; color:#388e3c;">Send your payment to:</p>
+        <div style="font-size:1.3em; color:#ffd600; font-family:'Pacifico',cursive; font-weight:bold;">0739864044</div>
+        <p style="margin-top:1em; color:#388e3c;">Supported Method:</p>
+        <ul style="text-align:left; color:#388e3c; font-size:1em; margin:0 auto 1em auto; max-width:200px;">
+            <li style="cursor:pointer;" onclick="selectPaymentMethod('Mpesa')"><img src="https://upload.wikimedia.org/wikipedia/commons/4/4e/M-PESA_Logo.png" alt="Mpesa" style="height:20px; vertical-align:middle; margin-right:0.5em;"> Mpesa</li>
+        </ul>
+        <div style="margin-top:1em; color:#388e3c; font-size:1em; background:#fffde9; border-radius:8px; padding:1em; box-shadow:0 2px 8px #a5d6a7;">
+          <strong>Steps to pay with Mpesa:</strong>
+          <ol style="margin-top:0.7em; margin-bottom:0.7em; text-align:left;">
+            <li>Go to your Mpesa menu on your phone.</li>
+            <li>Select <strong>Lipa na Mpesa</strong>.</li>
+            <li>Choose <strong>Send Money</strong>.</li>
+            <li>Enter the number <strong>0739864044</strong>.</li>
+            <li>Enter the amount <strong>KES 20</strong>.</li>
+            <li>Confirm and send.</li>
+            <li>After payment, click <strong>Verify Payment</strong> to get access.</li>
+          </ol>
+        </div>
+  <button onclick="closePayment()" style="background:#ffd600; color:#388e3c; border:none; border-radius:8px; padding:0.7em 1.5em; font-family:'Montserrat',Arial,sans-serif; font-size:1em; font-weight:bold; box-shadow:0 2px 8px #a5d6a7; cursor:pointer; margin-top:1em;">Close</button>
+  <button id="loginBtn" onclick="loginAndPay()" style="background:#4caf50; color:#fff; border:none; border-radius:8px; padding:0.7em 1.5em; font-family:'Montserrat',Arial,sans-serif; font-size:1em; font-weight:bold; box-shadow:0 2px 8px #a5d6a7; cursor:pointer; margin-top:1em;">Log In</button>
+  <button id="verifyPaymentBtn" onclick="customVerifyPayment()" style="background:#ffd600; color:#388e3c; border:none; border-radius:8px; padding:0.7em 1.5em; font-family:'Montserrat',Arial,sans-serif; font-size:1em; font-weight:bold; box-shadow:0 2px 8px #a5d6a7; cursor:pointer; margin-top:1em;">Verify Payment</button>
+  <div id="verifiedText" style="display:none; margin-top:1em; color:#4caf50; font-size:1.2em; font-weight:bold;">Verified</div>
+        <button id="verifyBtn" onclick="verifyPayment()" style="background:#ffd600; color:#388e3c; border:none; border-radius:8px; padding:0.7em 1.5em; font-family:'Montserrat',Arial,sans-serif; font-size:1em; font-weight:bold; box-shadow:0 2px 8px #a5d6a7; cursor:pointer; margin-top:1em; display:none;">
+          Verify Payment Received
+        </button>
+      </div>
+    </div>
+    <div style="display:none;">
+      <!-- Hidden section for demo purposes - to be removed in production -->
+      <h2>Demo Login</h2>
+      <p>Username: demo</p>
+      <p>Password: demo</p>
+      <button onclick="demoLogin()" style="background:#4caf50; color:#fff; border:none; border-radius:8px; padding:0.7em 1.5em; font-family:'Montserrat',Arial,sans-serif; font-size:1em; font-weight:bold; box-shadow:0 2px 8px #a5d6a7; cursor:pointer;">
+        Demo Log In
+      </button>
+    <div id="createdByModal" style="background:#fffde9; border-radius:16px; box-shadow:0 4px 24px #ffd600; padding:2em; max-width:350px; position:fixed; bottom:24px; right:24px; z-index:99999; text-align:center; font-family:'Montserrat',Arial,sans-serif; font-size:1.08em; color:#388e3c; font-weight:600;">
+      <img src="../.vscode/morg.jpg" alt="Profile Picture" style="height:70px; width:70px; border-radius:50%; object-fit:cover; box-shadow:0 2px 8px #fff; margin-bottom:0.7em;">
+        <h2 style="color:#388e3c; font-size:1.3em; font-weight:bold; margin-bottom:0.5em;">Created By</h2>
+        <div style="margin-bottom:0.7em;">Crop Pest Research Portal Team</div>
+    <div style="font-size:1.05em; color:#388e3c; margin-bottom:1em;">Working towards innovations for positive impacts in the society.</div>
+    <div style="font-size:1em; color:#222; font-style:italic; margin-bottom:1em;">"Empowering communities, transforming agriculture."</div>
+      </div>
+    </div>
+  </footer>
+  <div id="pesticideDetailsModal" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(44,62,80,0.8); z-index:9999; align-items:center; justify-content:center;">
+    <div id="pesticideDetailsContent" style="background:#fff; border-radius:16px; box-shadow:0 4px 24px #a5d6a7; padding:2em; max-width:400px; margin:auto; text-align:center;">
+      <!-- Pesticide details will be populated by JavaScript -->
+    </div>
+  </div>
+  <!-- Login/Register Modal -->
+  <div id="authModal" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(44,62,80,0.35); z-index:99999; align-items:center; justify-content:center;">
+    <div style="background:#fff; border-radius:16px; box-shadow:0 4px 24px #a5d6a7; padding:2em; max-width:350px; margin:auto; text-align:center;">
+      <h2 id="authModalTitle" style="color:#388e3c; font-family:'Montserrat',Arial,sans-serif;">Login</h2>
+      <form id="authForm" onsubmit="processAuth(event)" style="margin-top:1em;">
+        <input type="text" id="authUsername" placeholder="Username" required style="width:90%; margin-bottom:1em; padding:0.7em; border-radius:8px; border:1px solid #4caf50; font-size:1em;">
+        <input type="password" id="authPassword" placeholder="Password" required style="width:90%; margin-bottom:1em; padding:0.7em; border-radius:8px; border:1px solid #4caf50; font-size:1em;">
+        <div id="registerExtra" style="display:none;">
+          <input type="tel" id="authPhone" placeholder="Phone (optional)" style="width:90%; margin-bottom:1em; padding:0.7em; border-radius:8px; border:1px solid #4caf50; font-size:1em;">
+        </div>
+        <button type="submit" style="background:#ffd600; color:#388e3c; border:none; border-radius:8px; padding:0.7em 1.5em; font-family:'Montserrat',Arial,sans-serif; font-size:1em; font-weight:bold; box-shadow:0 2px 8px #a5d6a7; cursor:pointer; margin-top:0.5em;">Continue</button>
+      </form>
+      <button onclick="closeAuthModal()" style="background:#4caf50; color:#fff; border:none; border-radius:8px; padding:0.7em 1.5em; font-family:'Montserrat',Arial,sans-serif; font-size:1em; font-weight:bold; box-shadow:0 2px 8px #a5d6a7; cursor:pointer; margin-top:1em;">Close</button>
+      <div id="authMessage" style="margin-top:1em; color:#388e3c; font-size:1em;"></div>
+    </div>
+  </div>
+  <script>
+    // --- CHAT MODAL LOGIC ---
+    function openChatModal() {
+      document.getElementById('chatModal').style.display = 'flex';
+      setTimeout(function() {
+        var input = document.getElementById('chatInput');
+        if (input) input.focus();
+      }, 300);
+      loadChatHistory();
+    }
+    function closeChatModal() {
+      document.getElementById('chatModal').style.display = 'none';
+    }
+    // --- CHAT HISTORY LOGIC ---
+    const CHAT_STORAGE_KEY = 'chatHistory';
+    const CHAT_EXPIRY_KEY = 'chatHistoryExpiry';
+    let chatHistory = [];
+    let deleteIndex = null;
+    function loadChatHistory() {
+      const expiry = localStorage.getItem(CHAT_EXPIRY_KEY);
+      if (expiry && Date.now() > parseInt(expiry)) {
+        localStorage.removeItem(CHAT_STORAGE_KEY);
+        localStorage.removeItem(CHAT_EXPIRY_KEY);
+        chatHistory = [];
+      }
+      const stored = localStorage.getItem(CHAT_STORAGE_KEY);
+      chatHistory = stored ? JSON.parse(stored) : [];
+      renderChatMessages();
+    }
+    function saveChatHistory() {
+      localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(chatHistory));
+      localStorage.setItem(CHAT_EXPIRY_KEY, (Date.now() + 2*24*60*60*1000).toString());
+    }
+    function renderChatMessages() {
+      const messages = document.getElementById('chatMessages');
+      messages.innerHTML = '';
+      chatHistory.forEach((msg, idx) => {
+        if (msg.sender === 'user') {
+          const msgDiv = document.createElement('div');
+          msgDiv.style.marginBottom = '0.5em';
+          msgDiv.style.fontWeight = '600';
+          msgDiv.style.color = '#2196f3';
+          // Message text
+          const textSpan = document.createElement('span');
+          textSpan.textContent = 'You: ' + msg.text;
+          msgDiv.appendChild(textSpan);
+          // Date/time block
+          const dtBlock = document.createElement('div');
+          dtBlock.style.fontSize = '0.92em';
+          dtBlock.style.color = '#388e3c';
+          dtBlock.style.marginTop = '0.2em';
+          dtBlock.textContent = (msg.date && msg.time) ? (msg.date + ' ' + msg.time) : '';
+          msgDiv.appendChild(dtBlock);
+          // Delete button
+          const delBtn = document.createElement('button');
+          delBtn.textContent = 'Delete';
+          delBtn.style.marginLeft = '1em';
+            delBtn.style.background = '#ffd600';
+          delBtn.style.color = '#388e3c';
+          delBtn.style.border = 'none';
+          delBtn.style.borderRadius = '6px';
+          delBtn.style.padding = '0.2em 0.7em';
+          delBtn.style.fontSize = '0.95em';
+          delBtn.style.fontWeight = 'bold';
+          delBtn.style.cursor = 'pointer';
+          delBtn.onclick = function() { showDeleteChatModal(idx); };
+          msgDiv.appendChild(delBtn);
+          messages.appendChild(msgDiv);
+        }
+      });
+      messages.scrollTop = messages.scrollHeight;
+    }
+    function sendChatMessage(e) {
+  e.preventDefault();
+  const input = document.getElementById('chatInput');
+  const text = input.value.trim();
+  if (!text) return;
+  const now = new Date();
+  const dateStr = now.toLocaleDateString();
+  const timeStr = now.toLocaleTimeString();
+  chatHistory.push({ sender: 'user', text, date: dateStr, time: timeStr });
+  renderChatMessages();
+  saveChatHistory();
+  input.value = '';
+  showSentModal();
+    function showSentModal() {
+      const modal = document.getElementById('sentModal');
+      modal.style.display = 'flex';
+      setTimeout(() => {
+        modal.style.display = 'none';
+      }, 1000);
+    }
+    }
+    function showDeleteChatModal(idx) {
+      deleteIndex = idx;
+      document.getElementById('deleteChatModal').style.display = 'flex';
+      document.getElementById('confirmDeleteBtn').onclick = confirmDeleteChat;
+    }
+    function closeDeleteChatModal() {
+      document.getElementById('deleteChatModal').style.display = 'none';
+      deleteIndex = null;
+    }
+    function confirmDeleteChat() {
+      if (deleteIndex !== null && chatHistory[deleteIndex]) {
+        chatHistory.splice(deleteIndex, 1);
+        renderChatMessages();
+        saveChatHistory();
+      }
+      closeDeleteChatModal();
+    }
+    // Load chat history on page load (if modal is opened)
+    // ...existing code...
+    function goToChatSection() {
+      alert('Chat feature is currently unavailable.');
+    }
+// ...existing code...
+    // Expanded pest and disease data for crops, tree fruits, and vegetables, including pesticides
+    const pestData = [
+      {
+        crop: "Maize",
+        indigenousName: "Mahindi",
+        pest: "Fall Armyworm",
+        description: "A destructive pest that feeds on maize leaves and stems.",
+        management: [
+          "Regular field monitoring",
+          "Use pheromone traps",
+          "Apply recommended insecticides",
+          "Encourage natural predators (birds, wasps)"
+        ],
+        pesticides: [
+          { type: "Organic", name: "Neem oil" },
+          { type: "Artificial", name: "Lambda-cyhalothrin" }
+        ]
+      },
+      {
+        crop: "Maize",
+        pest: "Maize Weevil",
+        description: "Small beetle that damages stored maize grains.",
+        management: [
+          "Store maize in airtight containers",
+          "Use natural repellents like neem leaves",
+          "Sun-dry grains before storage"
+        ]
+      },
+      {
+        crop: "Tomato",
+        indigenousName: "Nyanya",
+        pest: "Tomato Leafminer (Tuta absoluta)",
+        description: "Larvae mine leaves, stems, and fruits causing major damage.",
+        management: [
+          "Remove and destroy infested plants",
+          "Use biological control (parasitoids)",
+          "Apply insecticides as per guidelines"
+        ],
+        pesticides: [
+          { type: "Organic", name: "Bacillus thuringiensis (Bt)" },
+          { type: "Artificial", name: "Abamectin" }
+        ]
+      },
+      {
+        crop: "Tomato",
+        pest: "Whiteflies",
+        description: "Tiny white insects that suck sap and transmit viruses.",
+        management: [
+          "Use yellow sticky traps",
+          "Spray insecticidal soap",
+          "Introduce natural predators (ladybugs)"
+        ]
+      },
+      {
+        crop: "Rice",
+        pest: "Rice Stem Borer",
+        description: "Larvae bore into rice stems, causing dead hearts and whiteheads.",
+        management: [
+          "Plant resistant varieties",
+          "Use light traps",
+          "Apply insecticides at early infestation"
+        ],
+        pesticides: [
+          { type: "Organic", name: "Neem extract" },
+          { type: "Artificial", name: "Carbofuran" }
+        ]
+      },
+      {
+        crop: "Rice",
+        pest: "Brown Planthopper",
+        description: "Sucks sap from rice plants, causing hopper burn.",
+        management: [
+          "Avoid excessive use of nitrogen fertilizer",
+          "Encourage natural predators (spiders)",
+          "Apply recommended insecticides"
+        ]
+      },
+      {
+        crop: "Potato",
+        indigenousName: "Viazi",
+        pest: "Colorado Potato Beetle",
+        description: "Adult beetles and larvae feed on potato leaves, reducing yield.",
+        management: [
+          "Handpick beetles and larvae",
+          "Use row covers to prevent infestation",
+          "Apply neem oil or recommended insecticides"
+        ],
+        pesticides: [
+          { type: "Organic", name: "Neem oil" },
+    { type: "Artificial", name: "Imidacloprid" },
+        ]
+      },
+      {
+        crop: "Potato",
+        pest: "Potato Aphid",
+        description: "Small green insects that suck sap and transmit viruses.",
+        management: [
+          "Spray with water to dislodge aphids",
+          "Use insecticidal soap",
+          "Introduce ladybugs"
+        ]
+      },
+      {
+        crop: "Cabbage",
+        indigenousName: "Kabeji",
+        pest: "Cabbage Worm",
+        description: "Green caterpillars that chew holes in cabbage leaves.",
+        management: [
+          "Inspect and remove worms manually",
+          "Use Bacillus thuringiensis (Bt) spray",
+          "Encourage natural predators (birds)"
+        ],
+        pesticides: [
+          { type: "Organic", name: "Bt spray" },
+          { type: "Artificial", name: "Permethrin" }
+        ]
+      },
+      {
+        crop: "Cabbage",
+        indigenousName: "Kabeji",
+        pest: "Aphids",
+        description: "Small sap-sucking insects that cause stunted growth and transmit diseases.",
+        management: [
+          "Spray plants with water to dislodge aphids",
+          "Introduce ladybugs (natural predators)",
+          "Use insecticidal soap"
+        ],
+        pesticides: [
+          { type: "Organic", name: "Insecticidal soap" },
+          { type: "Artificial", name: "Malathion" }
+        ]
+      },
+      {
+        crop: "Beans",
+        indigenousName: "Maharagwe",
+        pest: "Aphids",
+        description: "Small sap-sucking insects that cause stunted growth and transmit diseases.",
+        management: [
+          "Spray plants with water to dislodge aphids",
+          "Introduce ladybugs (natural predators)",
+          "Use insecticidal soap"
+        ],
+        pesticides: [
+          { type: "Organic", name: "Insecticidal soap" },
+          { type: "Artificial", name: "Malathion" }
+        ]
+      },
+      {
+        crop: "Beans",
+        indigenousName: "Maharagwe",
+        pest: "Bean Beetle",
+        description: "Yellow beetles that feed on bean leaves and pods.",
+        management: [
+          "Handpick beetles",
+          "Use row covers",
+          "Apply neem oil"
+        ]
+      },
+      {
+        crop: "Wheat",
+        pest: "Wheat Stem Sawfly",
+        description: "Larvae tunnel into wheat stems, causing lodging.",
+        management: [
+          "Plant solid-stemmed wheat varieties",
+          "Remove and destroy infested stems",
+          "Encourage natural predators"
+        ]
+      },
+      {
+        crop: "Wheat",
+        pest: "Hessian Fly",
+        description: "Larvae feed on wheat stems, stunting growth.",
+        management: [
+          "Plant resistant varieties",
+          "Rotate crops",
+          "Destroy crop residues after harvest"
+        ]
+      },
+      {
+        crop: "Banana",
+        indigenousName: "Ndizi",
+        pest: "Banana Weevil",
+        description: "Larvae bore into banana stems, weakening plants.",
+        management: [
+          "Use clean planting material",
+          "Remove and destroy infested plants",
+          "Apply neem-based products"
+        ]
+      },
+      {
+        crop: "Banana",
+        pest: "Banana Aphid",
+        description: "Sucks sap and transmits banana bunchy top virus.",
+        management: [
+          "Control weeds around banana plants",
+          "Use insecticidal soap",
+          "Introduce natural predators"
+        ]
+      },
+      {
+        crop: "Cassava",
+        pest: "Cassava Green Mite",
+        description: "Feeds on cassava leaves, causing yellowing and reduced yield.",
+        management: [
+          "Plant resistant varieties",
+          "Use acaricides",
+          "Encourage natural predators"
+        ]
+      },
+      {
+        crop: "Cassava",
+        pest: "Cassava Mealybug",
+        description: "Sucks sap from cassava, causing leaf curl and stunted growth.",
+        management: [
+          "Introduce parasitoid wasps",
+          "Use insecticidal soap",
+          "Remove infested plant parts"
+        ]
+      },
+      {
+        crop: "Coffee",
+        pest: "Coffee Berry Borer",
+        description: "Larvae bore into coffee berries, reducing quality.",
+        management: [
+          "Harvest berries promptly",
+          "Use traps",
+          "Apply biological control (Beauveria bassiana fungus)"
+        ]
+      },
+      {
+        crop: "Coffee",
+        pest: "Coffee Leaf Rust",
+        description: "Fungal disease causing yellow-orange spots on leaves.",
+        management: [
+          "Plant resistant varieties",
+          "Apply fungicides",
+          "Prune and remove infected leaves"
+        ]
+      },
+      {
+        crop: "Mango",
+        pest: "Mango Fruit Fly",
+        description: "Larvae infest mango fruits, causing rot.",
+        management: [
+          "Use fruit fly traps",
+          "Destroy infested fruits",
+          "Bag fruits to prevent infestation"
+        ]
+      },
+      {
+        crop: "Mango",
+        pest: "Mango Seed Weevil",
+        description: "Larvae feed inside mango seeds, affecting seed viability.",
+        management: [
+          "Remove and destroy infested fruits",
+          "Use clean planting material",
+          "Apply recommended insecticides"
+        ]
+      },
+      {
+        crop: "Mango",
+        pest: "Anthracnose",
+        description: "Fungal disease causing black spots on leaves, flowers, and fruits.",
+        management: [
+          "Prune and destroy infected plant parts",
+          "Apply copper-based fungicides",
+          "Ensure good air circulation"
+        ],
+        pesticides: [
+          { type: "Organic", name: "Neem oil" },
+          { type: "Artificial", name: "Copper oxychloride" }
+        ]
+      },
+      {
+        crop: "Mango",
+        pest: "Powdery Mildew",
+        description: "White powdery growth on leaves, flowers, and young fruits.",
+        management: [
+          "Apply sulfur-based fungicides",
+          "Prune affected areas",
+          "Avoid overhead irrigation"
+        ],
+        pesticides: [
+          { type: "Organic", name: "Potassium bicarbonate" },
+          { type: "Artificial", name: "Sulfur fungicide" }
+        ]
+      },
+      {
+        crop: "Avocado",
+        pest: "Avocado Root Rot (Phytophthora)",
+        description: "Fungal disease causing root decay and tree wilting.",
+        management: [
+          "Plant in well-drained soil",
+          "Avoid overwatering",
+          "Apply fungicides as recommended"
+        ]
+      },
+      {
+        crop: "Avocado",
+        pest: "Avocado Lace Bug",
+        description: "Insects that cause yellow spots and leaf drop.",
+        management: [
+          "Spray with insecticidal soap",
+          "Encourage natural predators",
+          "Remove heavily infested leaves"
+        ]
+      },
+      {
+        crop: "Apple",
+        pest: "Apple Scab",
+        description: "Fungal disease causing dark, scabby lesions on leaves and fruit.",
+        management: [
+          "Apply fungicides during early growth",
+          "Remove fallen leaves and fruit",
+          "Plant resistant varieties"
+        ],
+        pesticides: [
+          { type: "Organic", name: "Sulfur fungicide" },
+          { type: "Artificial", name: "Myclobutanil" }
+        ]
+      },
+      {
+        crop: "Apple",
+        pest: "Codling Moth",
+        description: "Larvae tunnel into apples, causing internal damage.",
+        management: [
+          "Use pheromone traps",
+          "Bag young fruits",
+          "Apply insecticides as needed"
+        ]
+      },
+      {
+        crop: "Apple",
+        pest: "Fire Blight",
+        description: "Bacterial disease causing wilting and blackening of shoots.",
+        management: [
+          "Prune infected branches",
+          "Disinfect pruning tools",
+          "Apply copper-based bactericides"
+        ]
+      },
+      {
+        crop: "Orange",
+        pest: "Citrus Canker",
+        description: "Bacterial disease causing raised lesions on leaves, stems, and fruit.",
+        management: [
+          "Remove and destroy infected plant material",
+          "Apply copper-based sprays",
+          "Plant resistant varieties"
+        ]
+      },
+      {
+        crop: "Orange",
+        pest: "Citrus Greening (HLB)",
+        description: "Bacterial disease causing yellow shoots, misshapen fruit, and tree decline.",
+        management: [
+          "Remove infected trees",
+          "Control psyllid insect vectors",
+          "Plant disease-free stock"
+        ]
+      },
+      {
+        crop: "Orange",
+        pest: "Citrus Leafminer",
+        description: "Larvae mine citrus leaves, causing curling and distortion.",
+        management: [
+          "Prune infested leaves",
+          "Apply horticultural oil",
+          "Encourage natural predators"
+        ],
+        pesticides: [
+          { type: "Organic", name: "Horticultural oil" },
+          { type: "Artificial", name: "Spinosad" }
+        ]
+      },
+      {
+        crop: "Banana",
+        pest: "Panama Disease (Fusarium Wilt)",
+        description: "Fungal disease causing yellowing and wilting of leaves.",
+        management: [
+          "Plant resistant varieties",
+          "Remove and destroy infected plants",
+          "Improve soil drainage"
+        ]
+      },
+      {
+        crop: "Banana",
+        pest: "Banana Bunchy Top Virus",
+        description: "Viral disease causing stunted growth and bunchy appearance.",
+        management: [
+          "Remove infected plants",
+          "Control aphid vectors",
+          "Use virus-free planting material"
+        ]
+      },
+      {
+        crop: "Banana",
+        indigenousName: "Ndizi",
+        pest: "Banana Weevil",
+        description: "Larvae bore into banana stems, weakening plants.",
+        management: [
+          "Use clean planting material",
+          "Remove and destroy infested plants",
+          "Apply neem-based products"
+        ]
+      },
+      {
+        crop: "Guava",
+        pest: "Fruit Fly",
+        description: "Larvae infest guava fruits, causing rot.",
+        management: [
+          "Use fruit fly traps",
+          "Destroy infested fruits",
+          "Bag fruits to prevent infestation"
+        ]
+      },
+      {
+        crop: "Guava",
+        pest: "Guava Wilt",
+        description: "Fungal disease causing wilting and death of branches.",
+        management: [
+          "Prune and destroy affected branches",
+          "Improve soil drainage",
+          "Apply fungicides"
+        ]
+      },
+      {
+        crop: "Peach",
+        pest: "Peach Leaf Curl",
+        description: "Fungal disease causing curled, red leaves.",
+        management: [
+          "Apply fungicides in early spring",
+          "Remove infected leaves",
+          "Plant resistant varieties"
+        ]
+      },
+      {
+        crop: "Peach",
+        pest: "Oriental Fruit Moth",
+        description: "Larvae tunnel into shoots and fruit.",
+        management: [
+          "Use pheromone traps",
+          "Apply insecticides as needed",
+          "Remove infested fruit"
+        ]
+      },
+      {
+        crop: "Pear",
+        pest: "Pear Psylla",
+        description: "Sap-sucking insects causing leaf yellowing and fruit drop.",
+        management: [
+          "Spray insecticidal soap",
+          "Encourage natural predators",
+          "Prune infested branches"
+        ]
+      },
+      {
+        crop: "Pear",
+        pest: "Fire Blight",
+        description: "Bacterial disease causing blackened shoots and fruit.",
+        management: [
+          "Prune infected branches",
+          "Disinfect pruning tools",
+          "Apply copper-based bactericides"
+        ]
+      },
+      {
+        crop: "Plum",
+        pest: "Plum Curculio",
+        description: "Beetles that lay eggs in fruit, causing scarring and drop.",
+        management: [
+          "Remove fallen fruit",
+          "Apply insecticides after petal fall",
+          "Bag young fruits"
+        ]
+      },
+      {
+        crop: "Plum",
+        pest: "Brown Rot",
+        description: "Fungal disease causing fruit rot and blossom blight.",
+        management: [
+          "Remove and destroy infected fruit",
+          "Apply fungicides during bloom",
+          "Prune for good air circulation"
+        ]
+      },
+      // Vegetable examples
+      {
+        crop: "Tomato",
+        pest: "Early Blight",
+        description: "Fungal disease causing dark spots on leaves and fruit.",
+        management: [
+          "Remove infected leaves",
+          "Rotate crops",
+          "Apply fungicides"
+        ],
+        pesticides: [
+          { type: "Organic", name: "Copper-based fungicide" },
+          { type: "Artificial", name: "Chlorothalonil" }
+        ]
+      },
+      {
+        crop: "Tomato",
+        pest: "Tomato Hornworm",
+        description: "Large green caterpillars that eat tomato leaves and fruit.",
+        management: [
+          "Handpick caterpillars",
+          "Encourage natural predators (parasitic wasps)",
+          "Apply Bt spray"
+        ],
+        pesticides: [
+          { type: "Organic", name: "Bacillus thuringiensis (Bt)" },
+          { type: "Artificial", name: "Spinosad" }
+        ]
+      },
+      {
+        crop: "Cabbage",
+        pest: "Black Rot",
+        description: "Bacterial disease causing yellowing and blackening of leaf veins.",
+        management: [
+          "Remove and destroy infected plants",
+          "Rotate crops",
+          "Use certified disease-free seeds"
+        ],
+        pesticides: [
+          { type: "Organic", name: "Copper-based bactericide" },
+          { type: "Artificial", name: "Streptomycin" }
+        ]
+      },
+      {
+        crop: "Spinach",
+        indigenousName: "Mchicha",
+        pest: "Downy Mildew",
+        description: "Fungal disease causing yellow patches and fuzzy growth on leaves.",
+        management: [
+          "Improve air circulation",
+          "Water early in the day",
+          "Apply fungicides"
+        ],
+        pesticides: [
+          { type: "Organic", name: "Potassium bicarbonate" },
+          { type: "Artificial", name: "Metalaxyl" }
+        ]
+      },
+      {
+        crop: "Carrot",
+        indigenousName: "Karoti",
+        pest: "Carrot Rust Fly",
+        description: "Larvae tunnel into carrot roots, causing rust-colored damage.",
+        management: [
+          "Use row covers",
+          "Rotate crops",
+          "Harvest early"
+        ],
+        pesticides: [
+          { type: "Organic", name: "Neem oil" },
+          { type: "Artificial", name: "Permethrin" }
+        ]
+      },
+      {
+        crop: "Onion",
+        indigenousName: "Kitunguu",
+        pest: "Onion Thrips",
+        description: "Tiny insects that feed on onion leaves, causing silver streaks.",
+        management: [
+          "Use reflective mulches",
+          "Apply insecticidal soap",
+          "Rotate crops"
+        ],
+        pesticides: [
+          { type: "Organic", name: "Insecticidal soap" },
+          { type: "Artificial", name: "Spinosad" }
+        ]
+      },
+      {
+        crop: "Lettuce",
+        indigenousName: "Saladi",
+        pest: "Aphids",
+        description: "Small sap-sucking insects that cause curling and yellowing of leaves.",
+        management: [
+          "Spray with water to dislodge aphids",
+          "Introduce ladybugs",
+          "Use insecticidal soap"
+        ],
+        pesticides: [
+          { type: "Organic", name: "Insecticidal soap" },
+          { type: "Artificial", name: "Malathion" }
+        ]
+      },
+      {
+        crop: "Pepper",
+        indigenousName: "Pilipili",
+        pest: "Pepper Weevil",
+        description: "Small beetles that lay eggs in pepper fruit, causing drop and rot.",
+        management: [
+          "Remove and destroy infested fruit",
+          "Use row covers",
+          " Apply insecticides"
+        ],
+        pesticides: [
+          { type: "Organic", name: "Neem oil" },
+          { type: "Artificial", name: "Permethrin" }
+        ]
+      },
+      {
+        crop: "Eggplant",
+        indigenousName: "Bilinganya",
+        pest: "Flea Beetles",
+        description: "Small beetles that chew tiny holes in leaves.",
+        management: [
+          "Use row covers",
+          "Apply neem oil",
+          "Encourage natural predators"
+        ],
+        pesticides: [
+          { type: "Organic", name: "Neem oil" },
+          { type: "Artificial", name: "Pyrethrin" }
+               ]
+      },
+      {
+        crop: "Pumpkin",
+        indigenousName: "Boga",
+        pest: "Powdery Mildew",
+        description: "White powdery growth on leaves and stems.",
+        management: [
+          "Improve air circulation",
+          "Apply sulfur-based fungicides",
+          "Water at soil level"
+        ],
+        pesticides: [
+          { type: "Organic", name: "Sulfur fungicide" },
+          { type: "Artificial", name: "Myclobutanil" }
+        ]
+      },
+      // Pesticide search entries
+      {
+        crop: "All",
+        pest: "Neem oil",
+        description: "Organic pesticide effective against many pests including aphids, beetles, and caterpillars.",
+        management: [
+          "Apply as foliar spray or soil drench"
+        ],
+        pesticides: [
+          { type: "Organic", name: "Neem oil" }
+        ]
+      },
+      {
+        crop: "All",
+        pest: "Copper oxychloride",
+        description: "Artificial fungicide for controlling fungal diseases in fruits and vegetables.",
+        management: [
+          "Apply as per label instructions"
+        ],
+        pesticides: [
+          { type: "Artificial", name: "Copper oxychloride" }
+        ]
+      },
+      {
+        crop: "All",
+        pest: "Sulfur fungicide",
+        description: "Organic fungicide for powdery mildew and scab in fruits and vegetables.",
+        management: [
+          "Apply as dust or spray"
+        ],
+        pesticides: [
+          { type: "Organic", name: "Sulfur fungicide" }
+        ]
+      },
+      {
+        crop: "All",
+        pest: "Imidacloprid",
+        description: "Artificial insecticide for beetles, aphids, and other sucking insects.",
+        management: [
+          "Apply as soil drench or foliar spray"
+        ],
+        pesticides: [
+          { type: "Artificial", name: "Imidacloprid" }
+        ]
+      },
+      {
+        crop: "Kales",
+        indigenousName: "Sukuma Wiki",
+        pest: "Cabbage Worm",
+        description: "Green caterpillars that chew holes in kales leaves.",
+        management: [
+          "Inspect and remove worms manually",
+          "Use Bacillus thuringiensis (Bt) spray",
+          "Encourage natural predators (birds)"
+        ],
+        pesticides: [
+          { type: "Organic", name: "Bt spray" },
+          { type: "Organic", name: "Neem oil" },
+          { type: "Artificial", name: "Permethrin" },
+          { type: "Artificial", name: "Cypermethrin" }
+        ]
+      },
+      {
+        crop: "Kales",
+        indigenousName: "Sukuma Wiki",
+        pest: "Aphids",
+        description: "Small sap-sucking insects that cause curling and yellowing of leaves.",
+        management: [
+          "Spray with water to dislodge aphids",
+          "Introduce ladybugs",
+          "Use insecticidal soap"
+        ],
+        pesticides: [
+          { type: "Organic", name: "Insecticidal soap" },
+          { type: "Organic", name: "Neem oil" },
+          { type: "Artificial", name: "Malathion" },
+          { type: "Artificial", name: "Imidacloprid" }
+        ]
+      }
+    ];
+
+    // Pesticide information database
+    const pesticideInfo = {
+      "Neem oil": {
+        description: {
+          en: "Neem oil is a natural pesticide derived from the seeds of the neem tree. It is effective against a wide range of pests, including aphids, beetles, and caterpillars. Neem oil disrupts the life cycle of pests, preventing them from feeding and reproducing.",
+          sw: "Mafuta ya mwarobaini ni dawa ya asili inayotokana na mbegu za mwarobaini. Inafaa dhidi ya wadudu wengi kama vile aphids, mende, na viwavi. Mafuta haya yanazuia wadudu kula na kuzaliana.",
+          luo: "Mafuta mar neem en dawa ma ok nyal kelo ketho, owuok kuom yany neem. Okwong'o joricho mang'eny kaka aphids, beetles, gi caterpillars. Mafuta mar neem oketo ketho e ngima mar joricho, okelo gi nyalo chamo gi nyalo yudo nyithindo."
+        },
+        otherNames: {
+          en: ["Azadirachtin", "Margosa oil"],
+          sw: ["Azadirachtin", "Mafuta ya Margosa"],
+          luo: ["Mwarobaini", "Osokonyo"]
+        },
+        usage: {
+          en: "Mix with water and spray on affected plants. Ensure thorough coverage.",
+          sw: "Changanya na maji kisha nyunyiza kwenye mimea iliyoathirika. Hakikisha umefunika vizuri.",
+          luo: "Komburu gi pi kendo nyuny e yath ma otho. Ang'o ni yath duto osekethore."
+        },
+        amount: {
+          en: "5 ml per liter of water",
+          sw: "5 ml kwa lita moja ya maji",
+          luo: "5 ml e lita achiel mar pi"
+        }
+      },
+      "Lambda-cyhalothrin": {
+        description: {
+          en: "Lambda-cyhalothrin is a synthetic pyrethroid insecticide that is effective against a wide range of pests, including caterpillars, beetles, and aphids. It works by disrupting the nervous system of insects.",
+          sw: "Lambda-cyhalothrin ni dawa ya wadudu ya kisasa inayofaa dhidi ya viwavi, mende, na aphids. Inafanya kazi kwa kuvuruga mfumo wa neva wa wadudu.",
+          luo: "Lambda-cyhalothrin en dawa ma ok nyal kelo ketho, ma oketo ketho e ngima mar joricho kaka viwavi, beetles, gi aphids. Oketo ketho e ngima mar joricho."
+        },
+        otherNames: {
+          en: ["Karate", "Warrior"],
+          sw: ["Karate", "Warrior"],
+          luo: ["Okwiri", "Jadwar"]
+        },
+        usage: {
+          en: "Dilute in water and apply as a foliar spray. Follow label instructions for dosage.",
+          sw: "Changanya na maji na nyunyiza kwenye majani. Fuata maelekezo ya lebo.",
+          luo: "Komburu gi pi kendo nyuny e yath. Winjo weche mag label."
+        },
+        amount: {
+          en: "1-2 ml per liter of water",
+          sw: "1-2 ml kwa lita moja ya maji",
+          luo: "1-2 ml e lita achiel mar pi"
+        }
+      },
+      "Pesticide A": {
+        description: {
+          en: "Description for Pesticide A.",
+          sw: "Maelezo ya Pesticide A.",
+          luo: "Wach mar Pesticide A."
+        },
+        otherNames: {
+          en: ["Alias A"],
+          sw: ["Alias A"],
+          luo: ["Herb A"]
+        },
+        usage: {
+          en: "Usage instructions for Pesticide A.",
+          sw: "Maelekezo ya matumizi ya Pesticide A.",
+          luo: "Tich mar Pesticide A."
+        },
+        amount: {
+          en: "Amount for Pesticide A",
+          sw: "Kiasi cha Pesticide A",
+          luo: "Rati mar Pesticide A"
+        }
+      },
+      "Pesticide B": {
+        description: {
+          en: "Description for Pesticide B.",
+          sw: "Maelezo ya Pesticide B.",
+          luo: "Wach mar Pesticide B."
+        },
+        otherNames: {
+          en: ["Alias B"],
+          sw: ["Alias B"],
+          luo: ["Herb B"]
+        },
+        usage: {
+          en: "Usage instructions for Pesticide B.",
+          sw: "Maelekezo ya matumizi ya Pesticide B.",
+          luo: "Tich mar Pesticide B."
+        },
+        amount: {
+          en: "Amount for Pesticide B",
+          sw: "Kiasi cha Pesticide B",
+          luo: "Rati mar Pesticide B"
+        }
+      },
+      "Copper oxychloride": {
+        description: {
+          en: "Copper oxychloride is a fungicide used to control fungal diseases in crops. It is effective against a wide range of fungi, including those causing leaf spots, blights, and rots.",
+          sw: "Copper oxychloride ni dawa ya kuua fangasi inayotumika kudhibiti magonjwa ya mimea. Inafaa dhidi ya fangasi mbalimbali kama vile madoa ya majani, kuoza, na blight.",
+          luo: "Copper oxychloride en dawa ma ok nyal kelo ketho, ma timo ketho e yath kaka madoa, blight, gi rot."
+        },
+        otherNames: {
+          en: ["Copper fungicide"],
+          sw: ["Dawa ya shaba"],
+          luo: ["Shaba"]
+        },
+        usage: {
+          en: "Mix with water and apply as a foliar spray. Ensure complete coverage of plant surfaces.",
+          sw: "Changanya na maji na nyunyiza kwenye majani. Fuata maelekezo ya lebo.",
+          luo: "Komburu gi pi kendo nyuny e yath. Winjo weche mag label."
+        },
+        amount: {
+          en: "3-4 g per liter of water",
+          sw: "3-4 g kwa lita moja ya maji",
+          luo: "3-4 g e lita achiel mar pi"
+        }
+      },
+      "Sulfur fungicide": {
+        description: {
+          en: "Sulfur fungicide is used to control powdery mildew, scab, and other fungal diseases in fruits and vegetables. It works by suffocating the fungal spores and inhibiting their growth.",
+          sw: "Sulfur fungicide hutumika kudhibiti ukungu, scab, na magonjwa mengine ya fangasi kwenye matunda na mboga. Inaua spores za fangasi na kuzuia ukuaji wao.",
+          luo: "Sulfur fungicide en dawa ma ok nyal kelo ketho, ma timo ketho e yath kaka powdery mildew, scab, gi mago mamoko. Oketo ketho e spores mar fungus."
+        },
+        otherNames: {
+          en: ["Elemental sulfur"],
+          sw: ["Sulphur asilia"],
+          luo: ["Sulfur"]
+        },
+        usage: {
+          en: "Apply as a dust or spray. Thoroughly cover all plant surfaces.",
+          sw: "Tumia kama unga au nyunyiza. Funika mimea yote vizuri.",
+          luo: "Tich kaka podo kata nyuny. Ang'o ni yath duto osekethore."
+        },
+        amount: {
+          en: "10 g per liter of water",
+          sw: "10 g kwa lita moja ya maji",
+          luo: "10 g e lita achiel mar pi"
+        }
+      },
+      "Imidacloprid": {
+        description: {
+          en: "Imidacloprid is a systemic insecticide that belongs to the neonicotinoid class of chemicals. It is effective against a variety of pests, including aphids, whiteflies, and termites.",
+          sw: "Imidacloprid ni dawa ya wadudu inayofanya kazi ndani ya mmea. Inafaa dhidi ya wadudu kama aphids, whiteflies, na termites.",
+          luo: "Imidacloprid en dawa ma ok nyal kelo ketho, ma timo tich e ngima mar yath. Okwong'o joricho kaka aphids, whiteflies, gi termites."
+        },
+        otherNames: {
+          en: ["Admire", "Gaucho"],
+          sw: ["Admire", "Gaucho"],
+          luo: ["Osokonyo", "Gaucho"]
+        },
+        usage: {
+          en: "Dilute in water and apply as a soil drench or foliar spray. Follow label instructions.",
+          sw: "Changanya na maji na tumia kwenye udongo au majani. Fuata maelekezo ya lebo.",
+          luo: "Komburu gi pi kendo tich e piny kata nyuny e yath. Winjo weche mag label."
+        },
+        amount: {
+          en: "0.5-1 ml per liter of water",
+          sw: "0.5-1 ml kwa lita moja ya maji",
+          luo: "0.5-1 ml e lita achiel mar pi"
+        }
+      },
+      "Abamectin": {
+        description: {
+          en: "Abamectin is an insecticide and acaricide used to control a wide range of pests, including mites, aphids, and caterpillars. It works by disrupting the nervous system of the pests.",
+          sw: "Abamectin ni dawa ya wadudu na utitiri inayodhibiti wadudu kama mites, aphids, na viwavi. Inavuruga mfumo wa neva wa wadudu.",
+          luo: "Abamectin en dawa ma ok nyal kelo ketho, ma timo tich e mites, aphids, gi caterpillars. Oketo ketho e ngima mar joricho."
+        },
+        otherNames: {
+          en: ["Avid"],
+          sw: ["Avid"],
+          luo: ["Herb Avid"]
+        },
+        usage: {
+          en: "Dilute in water and apply as a foliar spray. Ensure thorough coverage.",
+          sw: "Changanya na maji na nyunyiza kwenye majani. Hakikisha umefunika vizuri.",
+          luo: "Komburu gi pi kendo nyuny e yath. Ang'o ni yath duto osekethore."
+        },
+        amount: {
+          en: "1-2 ml per liter of water",
+          sw: "1-2 ml kwa lita moja ya maji",
+          luo: "1-2 ml e lita achiel mar pi"
+        }
+      },
+      "Permethrin": {
+        description: {
+          en: "Permethrin is a synthetic pyrethroid insecticide that is used to control a wide variety of pests, including mosquitoes, ticks, and agricultural pests.",
+          sw: "Permethrin ni dawa ya kisasa inayotumika kudhibiti wadudu kama mbu, kupe, na wadudu wa shamba.",
+          luo: "Permethrin en dawa ma ok nyal kelo ketho, ma timo tich e mbu, kupe, gi joricho mag shamba."
+        },
+        otherNames: {
+          en: ["Astro", "Dragnet"],
+          sw: ["Astro", "Dragnet"],
+          luo: ["Astro", "Dragnet"]
+        },
+        usage: {
+          en: "Dilute in water and apply as a spray. Follow label instructions for dosage.",
+          sw: "Changanya na maji na nyunyiza. Fuata maelekezo ya lebo.",
+          luo: "Komburu gi pi kendo nyuny. Winjo weche mag label."
+        },
+        amount: {
+          en: "2-5 ml per liter of water",
+          sw: "2-5 ml kwa lita moja ya maji",
+          luo: "2-5 ml e lita achiel mar pi"
+        }
+      },
+      "Malathion": {
+        description: {
+          en: "Malathion is an organophosphate insecticide that is used to control a wide range of pests, including aphids, thrips, and whiteflies.",
+          sw: "Malathion ni dawa ya wadudu aina ya organophosphate inayodhibiti aphids, thrips, na whiteflies.",
+          luo: "Malathion en dawa ma ok nyal kelo ketho, ma timo tich e aphids, thrips, gi whiteflies."
+        },
+        otherNames: {
+          en: ["Cythion"],
+          sw: ["Cythion"],
+          luo: ["Cythion"]
+        },
+        usage: {
+          en: "Dilute in water and apply as a foliar spray. Follow label instructions.",
+          sw: "Changanya na maji na nyunyiza kwenye majani. Fuata maelekezo ya lebo.",
+          luo: "Komburu gi pi kendo nyuny e yath. Winjo weche mag label."
+        },
+        amount: {
+          en: "5-10 ml per liter of water",
+          sw: "5-10 ml kwa lita moja ya maji",
+          luo: "5-10 ml e lita achiel mar pi"
+        }
+      },
+      "Pyrethrin": {
+        description: {
+          en: "Pyrethrin is a natural insecticide derived from chrysanthemum flowers. It is effective against a wide range of pests, including flies, mosquitoes, and garden pests.",
+          sw: "Pyrethrin ni dawa ya asili inayotokana na maua ya chrysanthemum. Inafaa dhidi ya wadudu kama inzi, mbu, na wadudu wa bustani.",
+          luo: "Pyrethrin en dawa ma ok nyal kelo ketho, owuok kuom dho chrysanthemum. Okwong'o joricho kaka inzi, mbu, gi joricho mag puothe."
+        },
+        otherNames: {
+          en: ["Pyrethrum"],
+          sw: ["Pyrethrum"],
+          luo: ["Pyrethrum"]
+        },
+        usage: {
+          en: "Mix with water and spray on affected plants. Reapply after rain.",
+          sw: "Changanya na maji na nyunyiza kwenye mimea iliyoathirika. Rudia baada ya mvua.",
+          luo: "Komburu gi pi kendo nyuny e yath ma otho. Tich kendo bang yawuot."
+        },
+        amount: {
+          en: "5 g per liter of water",
+          sw: "5 g kwa lita moja ya maji",
+          luo: "5 g e lita achiel mar pi"
+        }
+      },
+      "Chlorothalonil": {
+        description: {
+          en: "Chlorothalonil is a broad-spectrum fungicide used to control fungal diseases in crops. It is effective against a wide range of fungi, including those causing leaf spots, blights, and rots.",
+          sw: "Chlorothalonil ni dawa ya kuua fangasi inayotumika kudhibiti magonjwa ya mimea. Inafaa dhidi ya fangasi mbalimbali kama vile madoa ya majani, kuoza, na blight.",
+          luo: "Chlorothalonil en dawa ma ok nyal kelo ketho, ma timo ketho e yath kaka madoa, blight, gi rot."
+        },
+        otherNames: {
+          en: ["Bravo", "Echo"],
+          sw: ["Bravo", "Echo"],
+          luo: ["Bravo", "Echo"]
+        },
+        usage: {
+          en: "Mix with water and apply as a foliar spray. Follow label instructions.",
+          sw: "Changanya na maji na nyunyiza kwenye majani. Fuata maelekezo ya lebo.",
+          luo: "Komburu gi pi kendo nyuny e yath. Winjo weche mag label."
+        },
+        amount: {
+          en: "2-3 g per liter of water",
+          sw: "2-3 g kwa lita moja ya maji",
+          luo: "2-3 g e lita achiel mar pi"
+        }
+      },
+      "Copper-based fungicide": {
+        description: {
+          en: "Copper-based fungicides are used to control fungal diseases in plants. They are effective against a wide range of fungi, including those causing leaf spots, blights, and rots.",
+          sw: "Dawa za shaba hutumika kudhibiti magonjwa ya fangasi kwenye mimea. Inafaa dhidi ya fangasi kama madoa, kuoza, na blight.",
+          luo: "Dawa mag shaba timo ketho e yath kaka madoa, blight, gi rot."
+        },
+        otherNames: {
+          en: ["Copper oxychloride", "Copper sulfate"],
+          sw: ["Copper oxychloride", "Copper sulfate"],
+          luo: ["Copper oxychloride", "Copper sulfate"]
+        },
+        usage: {
+          en: "Mix with water and apply as a foliar spray. Ensure thorough coverage.",
+          sw: "Changanya na maji na nyunyiza kwenye majani. Hakikisha umefunika vizuri.",
+          luo: "Komburu gi pi kendo nyuny e yath. Ang'o ni yath duto osekethore."
+        },
+        amount: {
+          en: "3-4 g per liter of water",
+          sw: "3-4 g kwa lita moja ya maji",
+          luo: "3-4 g e lita achiel mar pi"
+        }
+      },
+      "Bacillus thuringiensis (Bt)": {
+        description: {
+          en: "Bacillus thuringiensis is a natural bacterium that is used as a biological insecticide. It is effective against caterpillars and other larvae.",
+          sw: "Bacillus thuringiensis ni bakteria ya asili inayotumika kama dawa ya wadudu. Inafaa dhidi ya viwavi na lava wengine.",
+          luo: "Bacillus thuringiensis en bacteria ma ok nyal kelo ketho, ma timo tich e caterpillars gi larvae mamoko."
+        },
+        otherNames: {
+          en: ["Bt"],
+          sw: ["Bt"],
+          luo: ["Bt"]
+        },
+        usage: {
+          en: "Mix with water and apply as a foliar spray. Target young larvae for best results.",
+          sw: "Changanya na maji na nyunyiza kwenye majani. Lenga lava wachanga kwa matokeo bora.",
+          luo: "Komburu gi pi kendo nyuny e yath. Tich gi larvae ma ok ochiek."
+        },
+        amount: {
+          en: "1-2 ml per liter of water",
+          sw: "1-2 ml kwa lita moja ya maji",
+          luo: "1-2 ml e lita achiel mar pi"
+        }
+      },
+      "Potassium bicarbonate": {
+        description: {
+          en: "Potassium bicarbonate is a fungicide used to control powdery mildew and other fungal diseases. It works by raising the pH on the leaf surface, making it inhospitable for fungi.",
+          sw: "Potassium bicarbonate ni dawa ya kuua fangasi inayotumika kudhibiti powdery mildew na magonjwa mengine ya fangasi. Inabadilisha pH ya majani na kuzuia ukuaji wa fangasi.",
+          luo: "Potassium bicarbonate en dawa ma ok nyal kelo ketho, ma timo ketho e powdery mildew gi mago mamoko. Oketo pH ma ok nyal kelo ketho e yath."
+        },
+        otherNames: {
+          en: ["Kaligreen"],
+          sw: ["Kaligreen"],
+          luo: ["Kaligreen"]
+        },
+        usage: {
+          en: "Mix with water and spray on affected plants. Ensure thorough coverage.",
+          sw: "Changanya na maji na nyunyiza kwenye mimea iliyoathirika. Hakikisha umefunika vizuri.",
+          luo: "Komburu gi pi kendo nyuny e yath ma otho. Ang'o ni yath duto osekethore."
+        },
+        amount: {
+          en: "5 g per liter of water",
+          sw: "5 g kwa lita moja ya maji",
+          luo: "5 g e lita achiel mar pi"
+        }
+      }
+    };
+
+    let freeSearchCount = 0;
+    let isPaidUser = false;
+    let isPaymentVerified = false;
+
+    // --- SEARCH ---
+function searchPest() {
+  const query = document.getElementById('pestInput').value.toLowerCase();
+  const resultsDiv = document.getElementById('results');
+  resultsDiv.innerHTML = '';
+  // Fuzzy match for misspellings
+  const matches = pestData.filter(item => {
+    const allTerms = [item.crop, item.indigenousName, item.pest, ...(item.pesticides ? item.pesticides.map(p => p.name) : [])];
+    return allTerms.some(term => term && fuzzyMatch(term.toLowerCase(), query));
+  });
+  if (matches.length === 0) {
+    // Suggest closest spelling
+    const allTerms = pestData.flatMap(item => [item.crop, item.indigenousName, item.pest, ...(item.pesticides ? item.pesticides.map(p => p.name) : [])]);
+    const suggestion = getClosestSuggestion(query, allTerms);
+    resultsDiv.innerHTML = `<div class="result-card"><h3>No results found</h3><p>Did you mean: <strong>${suggestion}</strong>?</p></div>`;
+    return;
+  }
+  matches.forEach(item => {
+    let pesticidesHtml = '';
+    if (item.pesticides && item.pesticides.length > 0) {
+      pesticidesHtml = `<div class="result-section" style="margin-top:1em;">
+        <div style="font-weight:600; color:#388e3c; margin-bottom:0.5em; display:flex; align-items:center; gap:0.5em;">
+          <img src='https://img.icons8.com/color/32/000000/spray.png' alt='Pesticide Icon' style='height:22px;'> Pesticides
+        </div>
+        <ul style="margin:0; padding-left:1.2em;">`;
+      item.pesticides.forEach(p => {
+        pesticidesHtml += `<li style="margin-bottom:0.5em;">
+          <span style="font-weight:500; color:${p.type==='Organic'?'#4caf50':'#2196f3'};">${p.type}: ${p.name}</span>
+          <button onclick="showPesticideDetails('${p.name}')" style="margin-left:1em; background:#ffd600; color:#388e3c; border:none; border-radius:6px; padding:0.3em 1em; font-size:0.95em; font-weight:bold; cursor:pointer;">Details</button>
+        </li>`;
+      });
+      pesticidesHtml += '</ul></div>';
+    }
+    resultsDiv.innerHTML += `
+      <div class="result-card" style="font-family:'Montserrat', Arial, sans-serif;">
+        <div class="result-section" style="margin-bottom:1em;">
+          <div style="font-size:1.15em; font-weight:700; color:#4caf50; display:flex; align-items:center; gap:0.5em;">
+            <img src='https://img.icons8.com/color/32/000000/plant-under-sun.png' alt='Crop Icon' style='height:22px;'> ${item.crop}${item.indigenousName ? ' (' + item.indigenousName + ')' : ''}
+          </div>
+          <div style="font-size:1.08em; font-weight:600; color:#2196f3; margin-top:0.3em; display:flex; align-items:center; gap:0.5em;">
+            <img src='https://img.icons8.com/color/32/000000/bug.png' alt='Pest Icon' style='height:22px;'> ${item.pest}
+          </div>
+        </div>
+        <div class="result-section" style="margin-bottom:1em;">
+          <div style="font-weight:600; color:#388e3c; margin-bottom:0.5em; display:flex; align-items:center; gap:0.5em;">
+            <img src='https://img.icons8.com/color/32/000000/info.png' alt='Description Icon' style='height:22px;'> Description
+          </div>
+          <div style="font-size:1em; color:#222;">${item.description}</div>
+        </div>
+        <div class="result-section" style="margin-bottom:1em;">
+          <div style="font-weight:600; color:#388e3c; margin-bottom:0.5em; display:flex; align-items:center; gap:0.5em;">
+            <img src='https://img.icons8.com/color/32/000000/maintenance.png' alt='Management Icon' style='height:22px;'> Management
+          </div>
+          <ul style="margin:0; padding-left:1.2em;">${item.management.map(m => `<li style='margin-bottom:0.4em;'>${m}</li>`).join('')}</ul>
+        </div>
+        ${pesticidesHtml}
+      </div>
+    `;
+  });
+}
+
+// Fuzzy match function for misspellings
+function fuzzyMatch(term, query) {
+  if (!query) return false;
+  if (term.includes(query)) return true;
+  // Levenshtein distance for fuzzy matching
+  return levenshtein(term, query) <= 2;
+}
+function levenshtein(a, b) {
+  const matrix = Array(a.length + 1).fill(null).map(() => Array(b.length + 1).fill(null));
+  for (let i = 0; i <= a.length; i++) matrix[i][0] = i;
+  for (let j = 0; j <= b.length; j++) matrix[0][j] = j;
+  for (let i = 1; i <= a.length; i++) {
+    for (let j = 1; j <= b.length; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      matrix[i][j] = Math.min(
+        matrix[i - 1][j] + 1,
+        matrix[i][j - 1] + 1,
+        matrix[i - 1][j - 1] + cost
+      );
+    }
+  }
+  return matrix[a.length][b.length];
+}
+function getClosestSuggestion(query, terms) {
+  let minDist = Infinity;
+  let best = '';
+  terms.forEach(term => {
+    if (!term) return;
+    const dist = levenshtein(term.toLowerCase(), query);
+    if (dist < minDist) {
+      minDist = dist;
+      best = term;
+    }
+  });
+  return best || 'No suggestion';
+}
+
+      function showPayment() {
+        document.getElementById('paymentModal').style.display = 'flex';
+        document.getElementById('loginBtn').style.display = isPaidUser ? 'none' : 'inline-block';
+        document.getElementById('verifyBtn').style.display = isPaidUser && !isPaymentVerified ? 'inline-block' : 'none';
+      }
+      function closePayment() {
+        document.getElementById('paymentModal').style.display = 'none';
+      }
+
+      // Simulate login (for demo purposes)
+      function loginAndPay() {
+        isPaidUser = true;
+        freeSearchCount = 0;
+        showPayment();
+      }
+
+      // Simulate payment verification
+      function customVerifyPayment() {
+        isPaymentVerified = true;
+        document.getElementById('verifiedText').style.display = 'block';
+        setTimeout(function() {
+          closePayment();
+          openSearchModal();
+        }, 1200);
+      }
+      function openSearchModal() {
+        var searchSection = document.querySelector('.search-section');
+        if (searchSection) {
+          searchSection.scrollIntoView({behavior: 'smooth'});
+          // Optionally, you can add code to open a modal if your search is modal-based
+        }
+      }
+
+      // Get all unique crops, indigenous names, pests, and diseases for suggestions
+      function getAllSuggestions() {
+        const suggestions = new Set();
+        pestData.forEach(item => {
+          suggestions.add(item.crop);
+          if (item.indigenousName) suggestions.add(item.indigenousName);
+          suggestions.add(item.pest);
+        });
+        return Array.from(suggestions);
+      }
+
+      // Show suggestions as user types
+      function showSuggestions() {
+        const input = document.getElementById('pestInput').value.toLowerCase();
+        const suggestionsDiv = document.getElementById('suggestions');
+        if (!input) {
+          suggestionsDiv.style.display = 'none';
+          return;
+        }
+        const allSuggestions = getAllSuggestions();
+        const filtered = allSuggestions.filter(s => s.toLowerCase().startsWith(input));
+        if (filtered.length === 0) {
+          suggestionsDiv.style.display = 'none';
+          return;
+        }
+  suggestionsDiv.innerHTML = filtered.map(s => `<div class="suggestion-item" onclick="selectSuggestion('${s}')" style="padding:0.7em 1em; margin:0.3em 0; border-radius:8px; background:#fff; box-shadow:0 1px 4px #a5d6a7; cursor:pointer; transition:background 0.2s; font-family:'Montserrat',cursive; font-size:1.08em; color:#388e3c; font-weight:bold;">${s}</div>`).join('');
+  suggestionsDiv.style.display = 'block';
+    }
+
+    // When a suggestion is clicked, fill the input
+    function selectSuggestion(suggestion) {
+      document.getElementById('pestInput').value = suggestion;
+      document.getElementById('suggestions').style.display = 'none';
+      searchPest();
+    }
+
+    function showPesticideDetails(pesticideName) {
+      // Find the pesticide info from the current search results if available
+      const query = document.getElementById('pestInput').value.toLowerCase();
+      let found = null;
+      let allPesticides = { organic: [], artificial: [] };
+      let dholuoHerbNames = {
+        "Neem oil": "yath mar mwarubaine",
+        "Neem extract": "Yany Neem",
+        "Bacillus thuringiensis (Bt)": "Bakteria mar Bt",
+        "Sulfur fungicide": "Sulfur asili",
+        "Potassium bicarbonate": "Potassium bicarbonate",
+        "Insecticidal soap": "Sabuni mar ketho joricho",
+        "Horticultural oil": "Mafuta mar yath",
+        "Copper-based fungicide": "Shaba",
+        "Copper oxychloride": "Shaba",
+        "Pyrethrin": "Maua mar Pyrethrum",
+        "Bt spray": "Bakteria mar Bt",
+        "Kaligreen": "Kaligreen",
+        "Elemental sulfur": "Sulfur asili",
+        "Sabuni mar ketho joricho": "Sabuni mar ketho joricho",
+        "Mafuta mar yath": "Mafuta mar yath"
+      };
+      pestData.forEach(item => {
+        if (item.pesticides) {
+          item.pesticides.forEach(p => {
+            if (p.name.toLowerCase() === pesticideName.toLowerCase()) {
+              found = { info: pesticideInfo[p.name], context: item };
+            }
+            if (p.type === "Organic" && !allPesticides.organic.includes(p.name)) {
+              allPesticides.organic.push(p.name);
+            }
+            if (p.type === "Artificial" && !allPesticides.artificial.includes(p.name)) {
+              allPesticides.artificial.push(p.name);
+            }
+          });
+        }
+      });
+      const modal = document.getElementById('pesticideDetailsModal');
+      const content = document.getElementById('pesticideDetailsContent');
+      if (!found || !found.info) {
+        content.innerHTML = `<h2 style=\"color:#388e3c;\">${pesticideName}</h2><p>No details available.</p><button onclick=\"closePesticideDetails()\" style=\"background:#ffd600; color:#388e3c; border:none; border-radius:8px; padding:0.7em 1.5em; font-size:1em; font-weight:bold; margin-top:1em;\">Close</button>`;
+      } else {
+        const info = found.info;
+  let organicList = allPesticides.organic.length > 0 ? `<ul>${allPesticides.organic.map(p => `<li>${p} <span style='color:#388e3c;'>(Dholuo: ${dholuoHerbNames[p] ? dholuoHerbNames[p] : 'Not available'})</span></li>`).join('')}</ul>` : 'None';
+        let artificialList = allPesticides.artificial.length > 0 ? `<ul>${allPesticides.artificial.map(p => `<li>${p}</li>`).join('')}</ul>` : 'None';
+        content.innerHTML = `
+          <h2 style=\"color:#388e3c; font-size:2em; font-family:'Montserrat',cursive; margin-bottom:0.5em;\">${pesticideName}</h2>
+          <div style=\"background:linear-gradient(90deg,#e8f5e9 0%,#ffd600 100%); border-radius:12px; box-shadow:0 2px 8px #a5d6a7; padding:1em 1.2em; margin-bottom:1em; font-size:1.1em;\">
+            <strong style=\"color:#388e3c; font-size:1.15em;\">Used for:</strong><br>
+            <span style=\"color:#388e3c; font-weight:bold;\">${found.context.crop}${found.context.indigenousName ? ' (' + found.context.indigenousName + ')' : ''} - ${found.context.pest}</span>
+          </div>
+          <div style=\"background:#fffde9; border-radius:10px; box-shadow:0 1px 4px #ffd600; padding:1em 1.2em; margin-bottom:1em; font-size:1.08em;\">
+            <strong style=\"color:#388e3c; font-size:1.12em;\">Description:</strong><br>
+            <span>${info.description.en}</span>
+          </div>
+          <div style=\"background:linear-gradient(90deg,#ffd600 0%,#e8f5e9 100%); border-radius:10px; box-shadow:0 1px 4px #a5d6a7; padding:1em 1.2em; margin-bottom:1em; font-size:1.08em;\">
+            <strong style=\"color:#388e3c; font-size:1.12em;\">Other Names:</strong><br>
+            <span>${info.otherNames.en.join(', ')}</span>
+          </div>
+          <div style=\"background:#e8f5e9; border-radius:10px; box-shadow:0 1px 4px #ffd600; padding:1em 1.2em; margin-bottom:1em; font-size:1.08em;\">
+            <strong style=\"color:#388e3c; font-size:1.12em;\">Usage:</strong><br>
+            <span>${info.usage.en}</span>
+          </div>
+          <div style=\"background:linear-gradient(90deg,#ffd600 0%,#e8f5e9 100%); border-radius:10px; box-shadow:0 1px 4px #a5d6a7; padding:1em 1.2em; margin-bottom:1em; font-size:1.08em;\">
+            <strong style=\"color:#388e3c; font-size:1.12em;\">Recommended Amount:</strong><br>
+            <span>${info.amount.en}</span>
+          </div>
+          <div style=\"background:#fffde9; border-radius:10px; box-shadow:0 1px 4px #ffd600; padding:1em 1.2em; margin-bottom:1em; font-size:1.08em;\">
+            <strong style=\"color:#388e3c; font-size:1.12em;\">All Possible Organic Pesticides:</strong><br>
+            ${organicList}
+          </div>
+          <div style=\"background:linear-gradient(90deg,#e8f5e9 0%,#ffd600 100%); border-radius:10px; box-shadow:0 1px 4px #a5d6a7; padding:1em 1.2em; margin-bottom:1em; font-size:1.08em;\">
+            <strong style=\"color:#388e3c; font-size:1.12em;\">All Possible Artificial Pesticides:</strong><br>
+            ${artificialList}
+          </div>
+          <button onclick=\"closePesticideDetails()\" style=\"background:#ffd600; color:#388e3c; border:none; border-radius:8px; padding:0.7em 1.5em; font-size:1.1em; font-weight:bold; margin-top:1em; box-shadow:0 2px 8px #a5d6a7;\">Close</button>
+        `;
+      }
+      modal.style.display = 'flex';
+    }
+
+    function closePesticideDetails() {
+      document.getElementById('pesticideDetailsModal').style.display = 'none';
+    }
+
+    function searchPestWithTrial() {
+      let loggedInUser = localStorage.getItem('loggedInUser');
+      if (!loggedInUser) {
+        showAuthModal('login');
+        return;
+      }
+      searchPest();
+    }
+  </script>
+    <footer style="position:relative; width:100%; min-height:120px; background:#fffde9; display:flex; align-items:center; justify-content:center;">
+      <div style="position:relative; z-index:1; width:100%; text-align:center; font-size:1em; color:#388e3c; font-weight:600;">&copy; 2025 Crop Pest Research Portal</div>
+    </footer>
+  </body>
+</html>
